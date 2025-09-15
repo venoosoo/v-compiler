@@ -1,0 +1,10 @@
+[Prog] -> [Stmt]*
+
+[Stmt] ->   {let ident = [Expr];
+            {exit([Expr]);
+
+[Expr] -> int_lit | ident
+
+[BinSumExpr] -> [Expr] + [Expr]
+
+[BinMultExpr] -> [Expr] * [Expr]
