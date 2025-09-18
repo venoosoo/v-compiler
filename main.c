@@ -62,6 +62,10 @@ void print_tokens(TokenArray* tokens) {
             case token_type_ident:         printf("ident"); break;
             case token_type_let_kw:        printf("let_kw"); break;
             case token_type_eq_kw:         printf("eq_kw"); break;
+            case token_type_plus:          printf("plus"); break;
+            case token_type_multi:         printf("multi"); break;
+            case token_type_minus:         printf("minus"); break;
+            case token_type_divide:        printf("divide"); break;
             default:                       printf("unknown"); break;
         }
 
@@ -158,6 +162,7 @@ int main(int argc, char *argv[]) {
 
     printf("PARSER RESULT:\n");
     print_optional_prog(&p_result);
+
 
 
 

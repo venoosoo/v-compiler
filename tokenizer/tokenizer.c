@@ -90,13 +90,16 @@ TokenArray tokenize(Token_data* t) {
             push_token_value(t, &tokens, token_type_int_lit);
 
         } else {
-            // single character tokens
-            consume(t); // consume current char
+            consume(t); 
             switch (c) {
                 case '(': push_token(t, &tokens, token_type_open_paren); break;
                 case ')': push_token(t, &tokens, token_type_close_paren); break;
                 case ';': push_token(t, &tokens, token_type_semi); break;
                 case '=': push_token(t, &tokens, token_type_eq_kw); break;
+                case '+': push_token(t, &tokens, token_type_plus); break;
+                case '*': push_token(t, &tokens, token_type_multi); break;
+                case '/': push_token(t, &tokens, token_type_divide); break;
+                case '-': push_token(t, &tokens, token_type_minus); break;
                 default: break; // ignore whitespace or unknown chars
             }
         }

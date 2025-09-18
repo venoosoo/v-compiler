@@ -63,6 +63,9 @@ void get_stmt(gen_data* g, const NodeStmt* stmt) {
         g->m_output = sdscatprintf(g->m_output, "   syscall\n");
         g->m_output = sdscatprintf(g->m_output, "   mov rdi, 0\n");
         g->m_output = sdscatprintf(g->m_output, "   syscall\n");
+    } else {
+        printf("Unkown statement");
+        exit(1);
     }
 }
 

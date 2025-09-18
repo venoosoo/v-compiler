@@ -6,6 +6,7 @@
 // ---- Forward declarations ----
 struct Parser_data;
 typedef struct Parser_data Parser_data;
+typedef struct NodeExpr NodeExpr;
 
 // ---- Parser data ----
 struct Parser_data {
@@ -27,32 +28,57 @@ typedef struct NodeExprIdent {
 
 typedef struct BinExprAdd BinExprAdd;
 typedef struct BinExprMulti BinExprMulti;
+typedef struct BinExprMinus BinExprMinus;
+typedef struct BinExprDivide BinExprDivide;
 typedef struct BinExpr BinExpr;
 
+typedef enum {
+    BIN_EXPR,
+    NODE_EXPR,
+} BindExprRecKind;
 
+typedef struct BindExprRec {
+    BindExprRecKind type;
+    union {
+        BinExpr* bin_expr;
+        NodeExpr* node_expr;
+    } as;
+} BindExprRec;
 
 struct BinExprAdd {
-    struct NodeExpr* lhs;
-    struct NodeExpr* rhs;
+    BindExprRec lhs;
+    BindExprRec rhs;
+};
+
+struct BinExprMinus {
+    BindExprRec lhs;
+    BindExprRec rhs;
 };
 
 struct BinExprMulti {
-    struct NodeExpr* lhs;
-    struct NodeExpr* rhs;
+    BindExprRec lhs;
+    BindExprRec rhs;
+};
+
+struct BinExprDivide {
+    BindExprRec lhs;
+    BindExprRec rhs;
 };
 
 typedef enum {
     BIN_EXPR_ADD,
-    BIN_EXPR_MULTI
+    BIN_EXPR_MULTI,
+    BIN_EXPR_MINUS,
+    BIN_EXPR_DIVIDE,
 } BinExprKind;
-
-
 
 struct BinExpr {
     BinExprKind kind;
     union {
         BinExprAdd add;
         BinExprMulti multi;
+        BinExprMinus minus;
+        BinExprDivide divide;
     } as;
 };
 
@@ -60,17 +86,17 @@ typedef enum {
     NODE_EXPR_INT_LIT,
     NODE_EXPR_IDENT,
     NODE_EXPR_BIN,
-    NODE_EXPR_EMPTY 
+    NODE_EXPR_EMPTY
 } NodeExprKind;
 
-typedef struct NodeExpr {
+struct NodeExpr {
     NodeExprKind kind;
     union {
         NodeExprIntLit int_lit;
         NodeExprIdent ident;
         BinExpr* bin;
     } as;
-} NodeExpr;
+};
 
 // ---- Statement types ----
 typedef struct NodeStmtExit {
@@ -108,6 +134,11 @@ typedef struct OptionalNodeExpr {
     NodeExpr value;
 } OptionalNodeExpr;
 
+typedef struct OptionalBinExpr {
+    int has_value;
+    BinExpr value;
+} OptionalBinExpr;
+
 typedef struct OptionalNodeStmt {
     int has_value;
     NodeStmt value;
@@ -128,6 +159,6 @@ OptionalNodeExpr parse_expr(Parser_data* p);
 OptionalNodeStmt parse_stmt(Parser_data* p);
 OptionalNodeProg parse_prog(Parser_data* p);
 
-// ---- Private helpers (renamed to avoid conflict) ----
-static inline OptionalToken parser_peek(Parser_data* p, int offset);
+// ---- Private helpers ----
+OptionalToken parser_peek(Parser_data* p, int offset);
 static inline Token parser_consume(Parser_data* p);

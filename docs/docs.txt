@@ -5,6 +5,7 @@
 
 [Expr] -> int_lit | ident
 
-[BinSumExpr] -> [Expr] + [Expr]
-
-[BinMultExpr] -> [Expr] * [Expr]
+[BinExpr] -> [BinExprAdd] // one of it can be to of b-tree 
+          -> [BinExprMulti]
+          -> [BinExprMinus]
+          -> [BinExprDivide]

@@ -1,3 +1,4 @@
 let x = 69;
-let y = x;
-exit(x);
+let z = 5;
+let y = x + 2 * 4 / z;
+exit(y);

@@ -21,6 +21,10 @@ typedef enum {
     token_type_ident,
     token_type_let_kw,
     token_type_eq_kw,
+    token_type_plus,
+    token_type_multi,
+    token_type_minus,
+    token_type_divide,
     token_empty,
 } TokenType;
 

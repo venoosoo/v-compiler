@@ -7,6 +7,7 @@ OUT = main
 # Source files
 SRC = main.c \
       parser/parser.c \
+      parser/binstmt/binstmt.c \
       tokenizer/tokenizer.c \
       generation/generation.c \
       libs/sds.c
