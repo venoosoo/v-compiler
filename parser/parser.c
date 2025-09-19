@@ -40,14 +40,14 @@ static inline Token parser_consume(Parser_data* p) {
 void print_bin_expr(BinExpr* node, int depth) {
     if (!node) return;
 
-    for (int i = 0; i < depth; i++) printf("  ");
+    for (int i = 0; i < depth; i++) printf("-");
 
     switch (node->kind) {
         case BIN_EXPR_ADD:
             printf("+\n");
             if (node->as.add.lhs.type == BIN_EXPR) print_bin_expr(node->as.add.lhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.add.lhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.add.lhs.as.node_expr;
                     if (n) {
@@ -59,7 +59,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             }
             if (node->as.add.rhs.type == BIN_EXPR) print_bin_expr(node->as.add.rhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.add.rhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.add.rhs.as.node_expr;
                     if (n) {
@@ -74,7 +74,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             printf("-\n");
             if (node->as.minus.lhs.type == BIN_EXPR) print_bin_expr(node->as.minus.lhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.minus.lhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.minus.lhs.as.node_expr;
                     if (n) {
@@ -86,7 +86,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             }
             if (node->as.minus.rhs.type == BIN_EXPR) print_bin_expr(node->as.minus.rhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.minus.rhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.minus.rhs.as.node_expr;
                     if (n) {
@@ -101,7 +101,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             printf("*\n");
             if (node->as.multi.lhs.type == BIN_EXPR) print_bin_expr(node->as.multi.lhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.multi.lhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.multi.lhs.as.node_expr;
                     if (n) {
@@ -113,7 +113,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             }
             if (node->as.multi.rhs.type == BIN_EXPR) print_bin_expr(node->as.multi.rhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.multi.rhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.multi.rhs.as.node_expr;
                     if (n) {
@@ -128,7 +128,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             printf("/\n");
             if (node->as.divide.lhs.type == BIN_EXPR) print_bin_expr(node->as.divide.lhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.divide.lhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.divide.lhs.as.node_expr;
                     if (n) {
@@ -140,7 +140,7 @@ void print_bin_expr(BinExpr* node, int depth) {
             }
             if (node->as.divide.rhs.type == BIN_EXPR) print_bin_expr(node->as.divide.rhs.as.bin_expr, depth + 1);
             else {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("-");
                 if (node->as.divide.rhs.type == NODE_EXPR) {
                     NodeExpr *n = node->as.divide.rhs.as.node_expr;
                     if (n) {
@@ -166,8 +166,6 @@ OptionalBinExpr parse_bin_stmt(Parser_data* p) {
     const int ptr_max = ptr - 1;
 
     // debug
-    printf("[debug] parse_bin_stmt: m_index=%d ptr=%d ptr_max=%d\n", p->m_index, ptr, ptr_max);
-    printf("[debug] tokens slice:\n");
     for (int i = 0; i <= ptr_max; i++) {
         OptionalToken tt = parser_peek(p, i);
         if (!tt.has_value) printf("  [%d]: <no token>\n", i);
@@ -200,12 +198,10 @@ OptionalBinExpr parse_bin_stmt(Parser_data* p) {
 
     OptionalBinExpr res = {0};
     if (op_index == -1) {
-        printf("[debug] parse_bin_stmt: no operator found in slice (ptr_max=%d)\n", ptr_max);
         res.has_value = 0;
         return res;
     }
 
-    printf("[debug] parse_bin_stmt: found op at index=%d type=%d\n", op_index, op_type);
 
     BinExpr* top = (BinExpr*)malloc(sizeof(BinExpr));
     if (!top) { fprintf(stderr,"Out of memory\n"); exit(1); }
@@ -234,7 +230,6 @@ OptionalBinExpr parse_bin_stmt(Parser_data* p) {
     BindExprRec rec = parse_bin_stmt_rec(p, top, op_index, ptr_max);
 
     if (rec.type != BIN_EXPR || rec.as.bin_expr == NULL) {
-        printf("[debug] parse_bin_stmt: parse_bin_stmt_rec returned non-BIN_EXPR or NULL\n");
         if (top) free(top);
         res.has_value = 0;
         return res;
@@ -243,8 +238,6 @@ OptionalBinExpr parse_bin_stmt(Parser_data* p) {
     res.has_value = 1;
     res.value = *rec.as.bin_expr;
 
-    printf("[debug] parse_bin_stmt: parsed tree:\n");
-    print_bin_expr(rec.as.bin_expr, 0);
 
     // consume tokens that belonged to this expression
     for (int i = 0; i <= ptr_max; i++) parser_consume(p);
@@ -267,9 +260,7 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
             (t2.value.type == token_type_int_lit || t2.value.type == token_type_ident)) {
 
             OptionalBinExpr bin = parse_bin_stmt(p);
-            printf("[debug] parse_expr: bin stmt has_value result: %d\n", bin.has_value);
             if (!bin.has_value) {
-                printf("[debug] parse_expr: parse_bin_stmt failed, returning empty expr\n");
                 return result;
             }
 
@@ -283,7 +274,6 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
             result.has_value = 1;
             result.value = *expr_heap;
 
-            printf("[debug] parse_expr: created NODE_EXPR_BIN, tree:\n");
             print_bin_expr(expr_heap->as.bin, 0);
             return result;
         } else {
