@@ -2,7 +2,8 @@
 #include "parser.h"
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <stdbool.h>
+#include "./binstmt/binstmt.h"
 // forward declaration implemented in binstmt.c
 extern BindExprRec parse_bin_stmt_rec(Parser_data* p, BinExpr* top, int ptr, const int ptr_max);
 
@@ -31,8 +32,10 @@ OptionalToken parser_peek(Parser_data* p, int offset) {
     return result;
 }
 
+
+
 // ---- Consume token ----
-static inline Token parser_consume(Parser_data* p) {
+Token parser_consume(Parser_data* p) {
     return kv_A(p->m_tokens, p->m_index++);
 }
 
@@ -42,7 +45,7 @@ void print_bin_expr(BinExpr* node, int depth) {
 
     for (int i = 0; i < depth; i++) printf("-");
 
-    switch (node->kind) {
+        switch (node->kind) {
         case BIN_EXPR_ADD:
             printf("+\n");
             if (node->as.add.lhs.type == BIN_EXPR) print_bin_expr(node->as.add.lhs.as.bin_expr, depth + 1);
@@ -70,6 +73,7 @@ void print_bin_expr(BinExpr* node, int depth) {
                 } else printf("UNKNOWN_RHS_TYPE\n");
             }
             break;
+
         case BIN_EXPR_MINUS:
             printf("-\n");
             if (node->as.minus.lhs.type == BIN_EXPR) print_bin_expr(node->as.minus.lhs.as.bin_expr, depth + 1);
@@ -97,6 +101,7 @@ void print_bin_expr(BinExpr* node, int depth) {
                 } else printf("UNKNOWN_RHS_TYPE\n");
             }
             break;
+
         case BIN_EXPR_MULTI:
             printf("*\n");
             if (node->as.multi.lhs.type == BIN_EXPR) print_bin_expr(node->as.multi.lhs.as.bin_expr, depth + 1);
@@ -124,6 +129,7 @@ void print_bin_expr(BinExpr* node, int depth) {
                 } else printf("UNKNOWN_RHS_TYPE\n");
             }
             break;
+
         case BIN_EXPR_DIVIDE:
             printf("/\n");
             if (node->as.divide.lhs.type == BIN_EXPR) print_bin_expr(node->as.divide.lhs.as.bin_expr, depth + 1);
@@ -151,97 +157,271 @@ void print_bin_expr(BinExpr* node, int depth) {
                 } else printf("UNKNOWN_RHS_TYPE\n");
             }
             break;
+
+        /* NEW: equality / relational / logical ops (use binop union) */
+        case BIN_EXPR_EQ:
+            printf("==\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_NEQ:
+            printf("!=\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_LT:
+            printf("<\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_LTE:
+            printf("<=\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_MR:
+            printf(">\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_MRE:
+            printf(">=\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_AND:
+            printf("&&\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+
+        case BIN_EXPR_OR:
+            printf("||\n");
+            if (node->as.binop.lhs.type == BIN_EXPR) print_bin_expr(node->as.binop.lhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.lhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.lhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_LHS_TYPE\n");
+            }
+            if (node->as.binop.rhs.type == BIN_EXPR) print_bin_expr(node->as.binop.rhs.as.bin_expr, depth + 1);
+            else {
+                for (int i = 0; i < depth + 1; i++) printf("-");
+                if (node->as.binop.rhs.type == NODE_EXPR) {
+                    NodeExpr *n = node->as.binop.rhs.as.node_expr;
+                    if (n) {
+                        if (n->kind == NODE_EXPR_INT_LIT) printf("INT(%s)\n", n->as.int_lit.int_lit.value);
+                        else if (n->kind == NODE_EXPR_IDENT) printf("IDENT(%s)\n", n->as.ident.ident.value);
+                        else printf("NODE(kind=%d)\n", n->kind);
+                    } else printf("NODE(NULL)\n");
+                } else printf("UNKNOWN_RHS_TYPE\n");
+            }
+            break;
+        
         default:
-            printf("???\n");
+            printf("UNKNOWN_BIN_KIND(%d)\n", node->kind);
             break;
     }
+
 }
 
 // ---- Parse binary statement ----
 OptionalBinExpr parse_bin_stmt(Parser_data* p) {
-    int ptr = 0;
-    while (parser_peek(p, ptr).has_value && parser_peek(p, ptr).value.type != token_type_semi) {
-        ptr++;
-    }
-    const int ptr_max = ptr - 1;
-
-    // debug
-    for (int i = 0; i <= ptr_max; i++) {
-        OptionalToken tt = parser_peek(p, i);
-        if (!tt.has_value) printf("  [%d]: <no token>\n", i);
-        else printf("  [%d]: type=%d val=%s\n", i, tt.value.type, tt.value.value ? tt.value.value : "NULL");
-    }
-
-    // Find operator index (+,- first, then *,/)
-    int op_index = -1;
-    TokenType op_type = 0;
-    for (int i = ptr_max; i >= 0; i--) {
-        OptionalToken t = parser_peek(p, i);
-        if (!t.has_value) continue;
-        if (t.value.type == token_type_plus || t.value.type == token_type_minus) {
-            op_index = i;
-            op_type = t.value.type;
-            break;
-        }
-    }
-    if (op_index == -1) {
-        for (int i = ptr_max; i >= 0; i--) {
-            OptionalToken t = parser_peek(p, i);
-            if (!t.has_value) continue;
-            if (t.value.type == token_type_multi || t.value.type == token_type_divide) {
-                op_index = i;
-                op_type = t.value.type;
-                break;
-            }
-        }
-    }
-
     OptionalBinExpr res = {0};
-    if (op_index == -1) {
+
+    OptionalNodeExpr expr_opt = parse_expr_to_terminator(p);
+    if (!expr_opt.has_value) {
         res.has_value = 0;
         return res;
     }
 
-
-    BinExpr* top = (BinExpr*)malloc(sizeof(BinExpr));
-    if (!top) { fprintf(stderr,"Out of memory\n"); exit(1); }
-
-    switch (op_type) {
-        case token_type_plus: top->kind = BIN_EXPR_ADD; break;
-        case token_type_minus: top->kind = BIN_EXPR_MINUS; break;
-        case token_type_multi: top->kind = BIN_EXPR_MULTI; break;
-        case token_type_divide: top->kind = BIN_EXPR_DIVIDE; break;
-        default:
-            fprintf(stderr, "Unknown operator\n");
-            free(top);
-            exit(1);
-    }
-
-    // initialize children to NODE_EXPR with NULL pointer to avoid garbage
-    top->as.add.lhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.add.rhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.minus.lhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.minus.rhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.multi.lhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.multi.rhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.divide.lhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-    top->as.divide.rhs = (BindExprRec){ .type = NODE_EXPR, .as.node_expr = NULL };
-
-    BindExprRec rec = parse_bin_stmt_rec(p, top, op_index, ptr_max);
-
-    if (rec.type != BIN_EXPR || rec.as.bin_expr == NULL) {
-        if (top) free(top);
+    // only accept binary expression results
+    if (expr_opt.value.kind != NODE_EXPR_BIN || expr_opt.value.as.bin == NULL) {
         res.has_value = 0;
         return res;
     }
 
+    // copy the BinExpr value out (caller often allocates a heap NodeExpr and copies this in)
     res.has_value = 1;
-    res.value = *rec.as.bin_expr;
-
-
-    // consume tokens that belonged to this expression
-    for (int i = 0; i <= ptr_max; i++) parser_consume(p);
+    res.value = *(expr_opt.value.as.bin);
     return res;
+}
+
+
+bool is_comparison_op(TokenType t) {
+    return t == token_type_cmp ||
+           t == token_type_less ||
+           t == token_type_less_eq ||
+           t == token_type_more ||
+           t == token_type_more_eq ||
+           t == token_type_not_eq ||
+           t == token_type_and ||
+           t == token_type_or;
 }
 
 // ---- Parse expression ----
@@ -249,11 +429,11 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
     OptionalNodeExpr result = {0};
     OptionalToken t = parser_peek(p, 0);
     if (!t.has_value) return result;
-
     if (t.value.type == token_type_int_lit || t.value.type == token_type_ident) {
         OptionalToken t1 = parser_peek(p, 1);
         OptionalToken t2 = parser_peek(p, 2);
 
+        // so we check if in expr second token is some operation and it has left and right
         if (t1.has_value && t2.has_value &&
             (t1.value.type == token_type_plus || t1.value.type == token_type_minus ||
              t1.value.type == token_type_multi || t1.value.type == token_type_divide) &&
@@ -274,9 +454,32 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
             result.has_value = 1;
             result.value = *expr_heap;
 
+
             print_bin_expr(expr_heap->as.bin, 0);
             return result;
-        } else {
+        }
+        // we have like x == 5
+        if (t1.has_value && is_comparison_op(t1.value.type)) {
+            OptionalBinExpr bin = parse_bin_stmt(p);
+            if (!bin.has_value) {
+                return result;
+            }
+
+            NodeExpr* expr_heap = (NodeExpr*)malloc(sizeof(NodeExpr));
+            if (!expr_heap) { fprintf(stderr,"Out of memory\n"); exit(1); }
+            expr_heap->kind = NODE_EXPR_BIN;
+            expr_heap->as.bin = (BinExpr*)malloc(sizeof(BinExpr));
+            if (!expr_heap->as.bin) { fprintf(stderr,"Out of memory\n"); exit(1); }
+            *expr_heap->as.bin = bin.value;
+
+            result.has_value = 1;
+            result.value = *expr_heap;
+
+
+            print_bin_expr(expr_heap->as.bin, 0);
+            return result;
+        }
+        else {
             NodeExpr expr;
             if (t.value.type == token_type_int_lit) {
                 expr.kind = NODE_EXPR_INT_LIT;
@@ -290,7 +493,6 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
             return result;
         }
     }
-
     return result;
 }
 
@@ -300,13 +502,17 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
 
     OptionalToken t0 = parser_peek(p, 0);
     if (t0.has_value && t0.value.type == token_type_exit_kw) {
-        parser_consume(p);
+        parser_consume(p); // consume exit
         if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_paren)) {
             fprintf(stderr,"Expected '('\n"); exit(1);
         }
-        parser_consume(p);
+        parser_consume(p); // (
         NodeStmtExit stmt_exit;
+        // parsing expr inside parentheses
+        printf("in parse_stmt.exit m_index before: %d\n", p->m_index);
         OptionalNodeExpr expr = parse_expr(p);
+        printf("in parse_stmt.exit m_index after: %d\n", p->m_index);
+
         if (!expr.has_value) { fprintf(stderr,"Invalid expression after exit\n"); exit(1); }
         stmt_exit.expr = expr.value;
         if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_paren)) {
@@ -317,6 +523,7 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
             fprintf(stderr,"Expected ';'\n"); exit(1);
         }
         parser_consume(p);
+        printf("in parse_stmt.exit m_index end: %d\n", p->m_index);
         NodeStmt node_stmt;
         node_stmt.kind = NODE_STMT_EXIT;
         node_stmt.as.exit_ = stmt_exit;
@@ -331,24 +538,120 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         t1.has_value && t1.value.type == token_type_ident &&
         t2.has_value && t2.value.type == token_type_eq_kw) {
 
-        parser_consume(p); // let
+        parser_consume(p); // consume let
         NodeStmtLet stmt_let;
         stmt_let.ident = parser_consume(p);
-        parser_consume(p); // =
+        parser_consume(p); // consume =
         OptionalNodeExpr expr = parse_expr(p);
+        if (parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_semi) {
+            parser_consume(p);
+        } else {
+            printf("debug: m_index: %d\n", p->m_index);
+            printf("Expected ;\n");
+            exit(1);
+        }
         if (!expr.has_value) { fprintf(stderr,"Invalid expression after let\n"); exit(1); }
         stmt_let.expr = expr.value;
         NodeStmt node_stmt;
         node_stmt.kind = NODE_STMT_LET;
         node_stmt.as.let = stmt_let;
-        if (parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_semi) parser_consume(p);
         result.has_value = 1;
         result.value = node_stmt;
         return result;
     }
 
+    if (t0.has_value && t0.value.type == token_type_if) {
+        // consume 'if'
+        parser_consume(p);
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_paren)) {
+            fprintf(stderr,"Expected '('\n"); exit(1);
+        }
+        parser_consume(p); // '('
+        printf("m_index in expr: %d\n", p->m_index);
+        OptionalNodeExpr cond = parse_expr(p);
+        if (!cond.has_value) { fprintf(stderr,"Invalid expression in if condition\n"); exit(1); }
+
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_paren)) {
+            printf("m_index in ): %d\n", p->m_index);
+            fprintf(stderr,"Expected ')'\n"); exit(1);
+        }
+        parser_consume(p); // ')'
+
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_braces)) {
+            fprintf(stderr,"Expected '{'\n"); exit(1);
+        }
+        parser_consume(p); // '{'
+
+        // parse inner statements until closing brace
+        NodeStmtArray body = {};
+        kv_init(body);
+        while (parser_peek(p,0).has_value && parser_peek(p,0).value.type != token_type_close_braces) {
+            OptionalNodeStmt inner = parse_stmt(p);
+            if (!inner.has_value) {
+                // print context to help debugging: show current token & index
+                OptionalToken cur = parser_peek(p, 0);
+                if (cur.has_value) {
+                    fprintf(stderr, "Failed to parse statement inside else at index %d: token type=%d\n", p->m_index, cur.value.type);
+                } else {
+                    fprintf(stderr, "Failed to parse statement inside else at index %d: no token\n", p->m_index);
+                }
+                exit(1);
+            }
+            kv_push(NodeStmt, body, inner.value);
+        }
+
+
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_braces)) {
+            fprintf(stderr,"Expected '}'\n"); exit(1);
+        }
+        parser_consume(p); // '}'
+
+        NodeStmtIf n_if;
+        n_if.cond = cond.value;
+        n_if.body = body;
+
+        NodeStmt node_stmt;
+        node_stmt.kind = NODE_STMT_IF;
+        node_stmt.as.if_ = n_if;
+        result.has_value = 1;
+        result.value = node_stmt;
+        return result;
+    }
+    if (t0.has_value && t0.value.type == token_type_else) {
+        printf("parsing else\n");
+        parser_consume(p);
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_braces)) {
+            fprintf(stderr,"Expected '{'\n"); exit(1);
+        }
+        parser_consume(p); // '{'
+
+        NodeStmtArray body;
+        kv_init(body);
+        while (parser_peek(p,0).has_value && parser_peek(p,0).value.type != token_type_close_braces) {
+            OptionalNodeStmt inner = parse_stmt(p);
+            if (!inner.has_value) { fprintf(stderr,"Failed to parse statement inside if\n"); exit(1); }
+            kv_push(NodeStmt, body, inner.value);
+        }
+        printf("m_index: %d\n", p->m_index);
+
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_braces)) {
+            fprintf(stderr,"Expected '}'\n"); exit(1);
+        }
+        parser_consume(p); // '}'
+        NodeStmtElse n_else;
+        n_else.body = body;
+        NodeStmt node_stmt;
+        node_stmt.kind = NODE_STMT_ELSE;
+        node_stmt.as.else_ = n_else;
+        result.has_value = 1;
+        result.value = node_stmt;
+        printf("result: %d\n", result.has_value);
+        return result;
+    }
+
     return result;
 }
+
 
 // ---- Parse program ----
 OptionalNodeProg parse_prog(Parser_data* p) {
@@ -356,6 +659,7 @@ OptionalNodeProg parse_prog(Parser_data* p) {
     kv_init(result.value.stmt);
 
     while (parser_peek(p,0).has_value) {
+        printf("PARSED STMT AT: %d and %d\n", p->m_index, parser_peek(p,0).has_value);
         OptionalNodeStmt stmt = parse_stmt(p);
         if (!stmt.has_value) { fprintf(stderr,"Failed to parse statement\n"); exit(1); }
         kv_push(NodeStmt, result.value.stmt, stmt.value);

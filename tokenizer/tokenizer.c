@@ -1,6 +1,7 @@
 #include "tokenizer.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <ctype.h>
 
 #define INVALID_CHAR '\xFF'
@@ -77,7 +78,12 @@ TokenArray tokenize(Token_data* t) {
                 push_token(t, &tokens, token_type_exit_kw);
             } else if (strcmp(t->m_buf, "let") == 0) {
                 push_token(t, &tokens, token_type_let_kw);
-            } else {
+            } else if (strcmp(t->m_buf, "if") == 0) {
+                push_token(t, &tokens, token_type_if);
+            } else if (strcmp(t->m_buf, "else") == 0) {
+                push_token(t, &tokens, token_type_else);
+            }
+            else {
                 push_token_value(t, &tokens, token_type_ident);
             }
 
@@ -95,11 +101,21 @@ TokenArray tokenize(Token_data* t) {
                 case '(': push_token(t, &tokens, token_type_open_paren); break;
                 case ')': push_token(t, &tokens, token_type_close_paren); break;
                 case ';': push_token(t, &tokens, token_type_semi); break;
-                case '=': push_token(t, &tokens, token_type_eq_kw); break;
+                case '=': 
+                    
+                    if (peek(t,0) != INVALID_CHAR && peek(t,0) == '=') {
+                        push_token(t, &tokens, token_type_cmp);
+                        consume(t); // consume second equal
+                         break;
+                    } else {
+                        push_token(t, &tokens, token_type_eq_kw); break;
+                    }
                 case '+': push_token(t, &tokens, token_type_plus); break;
                 case '*': push_token(t, &tokens, token_type_multi); break;
                 case '/': push_token(t, &tokens, token_type_divide); break;
                 case '-': push_token(t, &tokens, token_type_minus); break;
+                case '{': push_token(t, &tokens, token_type_open_braces); break;
+                case '}': push_token(t, &tokens, token_type_close_braces); break;
                 default: break; // ignore whitespace or unknown chars
             }
         }

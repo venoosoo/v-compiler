@@ -28,4 +28,4 @@ $(OUT): $(OBJ)
 
 # Clean up
 clean:
-	rm -f $(OBJ) $(OUT)
+	rm -f $(OBJ) $(OUT) v

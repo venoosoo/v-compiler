@@ -66,6 +66,19 @@ void print_tokens(TokenArray* tokens) {
             case token_type_multi:         printf("multi"); break;
             case token_type_minus:         printf("minus"); break;
             case token_type_divide:        printf("divide"); break;
+            case token_type_if:            printf("if"); break;
+            case token_type_else:          printf("else"); break;
+            case token_type_open_braces:   printf("open_braces"); break;
+            case token_type_close_braces:  printf("close_braces"); break;
+            case token_type_cmp:           printf("cmp"); break;
+            case token_type_less:          printf("less"); break;
+            case token_type_less_eq:       printf("less_eq"); break;
+            case token_type_more:          printf("more"); break;
+            case token_type_more_eq:       printf("more_eq"); break;
+            case token_type_not_eq:        printf("not_eq"); break;
+            case token_type_and:           printf("and"); break;
+            case token_type_or:            printf("or"); break;
+            case token_empty:              printf("empty"); break;
             default:                       printf("unknown"); break;
         }
 
@@ -76,6 +89,7 @@ void print_tokens(TokenArray* tokens) {
         }
     }
 }
+
 
 
 void print_optional_prog(OptionalNodeProg* prog) {
@@ -125,6 +139,23 @@ void print_optional_prog(OptionalNodeProg* prog) {
                         printf("  Expr: EMPTY\n");
                         break;
                 }
+                break;
+            case NODE_STMT_IF:
+                printf("Statement %zu: IF\n",i);
+                switch (stmt->as.if_.cond.kind) {
+                    case NODE_EXPR_INT_LIT:
+                        printf("    Expr: INT_LIT\n");
+                        break;
+                    case NODE_EXPR_IDENT:
+                        printf("    Expr: IDENT\n");
+                        break;
+                    case NODE_EXPR_BIN:
+                        printf("    Expr: BIN\n");
+                        break;
+                }
+                break;
+            case NODE_STMT_ELSE:
+                printf("Statement %zu: ELSE\n",i);
                 break;
         }
     }

@@ -2,10 +2,13 @@
 
 [Stmt] ->   {let ident = [Expr];
             {exit([Expr]);
+            {if([Expr]) {}
 
-[Expr] -> int_lit | ident
+[Expr] -> int_lit | ident | BinExpr | Compare
 
-[BinExpr] -> [BinExprAdd] // one of it can be to of b-tree 
+[BinExpr] -> [BinExprAdd] // one of it can be top of b-tree 
           -> [BinExprMulti]
           -> [BinExprMinus]
           -> [BinExprDivide]
+
+[

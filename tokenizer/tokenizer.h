@@ -25,6 +25,18 @@ typedef enum {
     token_type_multi,
     token_type_minus,
     token_type_divide,
+    token_type_if,
+    token_type_else,
+    token_type_open_braces,
+    token_type_close_braces,
+    token_type_cmp,
+    token_type_less,
+    token_type_less_eq,
+    token_type_more,
+    token_type_more_eq,
+    token_type_not_eq,
+    token_type_and,
+    token_type_or,
     token_empty,
 } TokenType;
 
