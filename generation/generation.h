@@ -28,14 +28,21 @@ KHASHL_MAP_INIT(KH_LOCAL, str_var_t, str_var,
                 var*,          /* value type (pointer to var) */
                 kh_hash_str,   /* string hash provided by khashl */
                 kh_eq_str)     /* string equality provided by khashl */
-
+typedef kvec_t(char*) StrVec;
+// vector of vector-of-strings
+typedef kvec_t(StrVec) Str2DVec;
 /* gen_data */
 typedef struct gen_data {
     const NodeProg* m_prog;   /* pointer to parsed program */
     size_t m_stack_pos;
     sds m_output;
     str_var_t *m_vars;        /* map instance pointer (returned by str_var_init()) */
+    Str2DVec *m_block; // for local visibility
 } gen_data;
+
+
+
+
 
 /* functions */
 gen_data* generate_gen_data(const NodeProg* root);

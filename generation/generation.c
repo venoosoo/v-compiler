@@ -8,6 +8,7 @@
 #include <stdarg.h>
 
 
+
 static void emit(gen_data* g, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -139,8 +140,7 @@ static void collect_vars_in_expr(const NodeExpr* expr, gen_data* g) {
     }
 }
 
-// Assign slot indices in source order. This is a deterministic single pass that increments next_slot
-// each time we encounter a LET node. It also ensures nested lets are assigned in appearance order.
+
 static void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g, int* next_slot) {
     if (!stmt || !g || !next_slot) return;
     if (stmt->kind == NODE_STMT_LET) {
@@ -165,14 +165,10 @@ static void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g, int* next_sl
     }
 }
 
-// --------------------------
-// Codegen helpers
-// --------------------------
 
-// Look up slot index for variable; error (exit) if undefined at codegen time.
 static int lookup_var_slot(gen_data* g, const char* name) {
     khint_t k = str_var_get(g->m_vars, name);
-    if (k == kh_end(g->m_vars)) {
+    if (k == kh_end(g->m_vars) || !kh_exist(g->m_vars, k)) {
         fprintf(stderr, "Undefined variable at codegen: %s\n", name);
         exit(1);
     }
@@ -303,7 +299,7 @@ static void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
 
 // Evaluate NodeExpr (result in rax)
 static void gen_expr_to_rax(gen_data* g, const NodeExpr* expr) {
-    if (!expr) { emit(g, "   ; gen_expr: NULL\n"); return; }
+    if (expr->kind == NODE_EXPR_EMPTY) { emit(g, "   ; gen_expr: NULL\n"); return; }
     if (expr->kind == NODE_EXPR_INT_LIT) {
         emit(g, "   mov rax, %s\n", expr->as.int_lit.int_lit.value);
         return;
@@ -320,12 +316,77 @@ static void gen_expr_to_rax(gen_data* g, const NodeExpr* expr) {
     }
 }
 
+void delete_local_var(gen_data *g) {
+    if (!g || !g->m_block || kv_size(*g->m_block) == 0 || !g->m_vars) {
+        fprintf(stderr, "Error: gen_data or m_block or m_vars is null/empty\n");
+        exit(EXIT_FAILURE);
+    }
+
+    Str2DVec *blocks = g->m_block;
+    size_t last_block_idx = kv_size(*blocks) - 1;
+    StrVec *last_block = &kv_A(*blocks, last_block_idx);
+
+    // Iterate strings in last_block
+    for (size_t i = 0; i < kv_size(*last_block); i++) {
+        char *key = kv_A(*last_block, i);
+
+        // Try to find key in hashmap
+        khint_t k = str_var_get(g->m_vars, key);
+        if (k == kh_end(g->m_vars)) {
+            fprintf(stderr, "Error: key '%s' not found in hashmap\n", key);
+            exit(EXIT_FAILURE);
+        }
+
+        // free stored key (we strdup'ed it in ensure_var_slot)
+        char *stored_key = kh_key(g->m_vars, k);
+        if (stored_key) free(stored_key);
+
+        // free value struct
+        var* vp = kh_val(g->m_vars, k);
+        if (vp) free(vp);
+
+        // remove entry from hashmap
+        str_var_del(g->m_vars, k);
+    }
+}
+
+
+// removes last block from g->m_block
+void remove_last_block(gen_data *g) {
+    if (!g || !g->m_block || kv_size(*g->m_block) == 0)
+        return; // nothing to remove
+
+    Str2DVec *blocks = g->m_block;
+    size_t last_block_idx = kv_size(*blocks) - 1;
+
+    // Get pointer to the last block (the real one inside the outer vector)
+    StrVec *last_block = &kv_A(*blocks, last_block_idx);
+
+    // Free all strings in the last block
+    for (size_t i = 0; i < kv_size(*last_block); i++) {
+        free(kv_A(*last_block, i));
+    }
+
+    // Destroy the inner vector (pass the actual vector)
+    kv_destroy(*last_block);
+
+    // Remove the last element from outer vector
+    kv_pop(*blocks);
+
+}
 
 static void gen_stmt(gen_data* g, const NodeStmt* stmt) {
     if (!stmt) return;
 
     if (stmt->kind == NODE_STMT_LET) {
-        // evaluate expression into rax, store to var slot
+
+        if (kv_size(*g->m_block) > 0) {
+            size_t last_row_index = kv_size(*g->m_block) - 1;
+            StrVec *last_row = &kv_A(*g->m_block, last_row_index); // pointer to real inner vector
+            char *s = strdup(stmt->as.let.ident.value);
+            if (!s) { perror("strdup"); exit(1); }
+            kv_push(char*, *last_row, s); // push into the actual inner vector
+        }
         gen_expr_to_rax(g, &stmt->as.let.expr);
         int slot = lookup_var_slot(g, stmt->as.let.ident.value);
         int off = slot_to_offset(slot);
@@ -348,17 +409,27 @@ static void gen_stmt(gen_data* g, const NodeStmt* stmt) {
         int id = next_label();
         emit(g, "   je .L_if_end_%d\n", id);
         // body
+        StrVec row;
+        kv_init(row);
+        kv_push(StrVec, *g->m_block, row);
         for (size_t i = 0; i < kv_size(stmt->as.if_.body); ++i) {
             gen_stmt(g, &kv_A(stmt->as.if_.body, i));
         }
+        delete_local_var(g);
+        remove_last_block(g);
         emit(g, ".L_if_end_%d:\n", id);
         return;
     }
     if (stmt->kind == NODE_STMT_ELSE) {
         int id = next_label();
+        StrVec row;
+        kv_init(row);
+        kv_push(StrVec, *g->m_block, row);
         for (size_t i = 0; i < kv_size(stmt->as.else_.body); ++i) {
             gen_stmt(g, &kv_A(stmt->as.else_.body, i));
         }
+        delete_local_var(g);
+        remove_last_block(g);
         emit(g, ".L_else_end_%d:\n", id);
         return;
     }
@@ -366,10 +437,9 @@ static void gen_stmt(gen_data* g, const NodeStmt* stmt) {
     emit(g, "   ; gen_stmt: unknown stmt kind %d\n", stmt->kind);
 }
 
+// function for deleting local var when their block ends
 
-// ------------------------
-// Top-level entry
-// ------------------------
+
 gen_data* generate_gen_data(const NodeProg* root) {
     if (!root) return NULL;
     gen_data* g = malloc(sizeof(gen_data));
@@ -381,6 +451,9 @@ gen_data* generate_gen_data(const NodeProg* root) {
     g->m_prog = root;
     g->m_stack_pos = 0;
     g->m_output = sdsempty();
+    Str2DVec vec2d;
+    g->m_block = malloc(sizeof(Str2DVec));
+    kv_init(*g->m_block);
 
     g->m_vars = str_var_init();
     if (!g->m_vars) { free(g); return NULL; }
