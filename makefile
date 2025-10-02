@@ -10,8 +10,8 @@ SRC = main.c \
       parser/binstmt/binstmt.c \
       tokenizer/tokenizer.c \
       generation/generation.c \
+      generation/helper/helper.c \
       libs/sds.c  \
-      main.asm
 
 # Object files
 OBJ = $(SRC:.c=.o)

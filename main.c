@@ -9,6 +9,7 @@
 #include "generation/generation.h"
 
 
+
 typedef struct {
     char *data;
     size_t size;
