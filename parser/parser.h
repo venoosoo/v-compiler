@@ -99,11 +99,19 @@ typedef struct NodeStmtLet {
     NodeExpr expr;
 } NodeStmtLet;
 
+
+typedef struct NodeStmtVchange {
+    Token ident;
+    NodeExpr expr;
+} NodeStmtVchange;
+
 typedef enum {
     NODE_STMT_EXIT,
     NODE_STMT_LET,
+    NODE_STMT_VCHANGE,
     NODE_STMT_IF,
     NODE_STMT_ELSE,
+    NODE_STMT_WHILE,
 } NodeStmtKind;
 
 typedef struct NodeStmtIf {
@@ -115,6 +123,11 @@ typedef struct NodeStmtElse {
     NodeStmtArray body;
 } NodeStmtElse;
 
+typedef struct NodeStmtWhile {
+    NodeExpr cond;
+    NodeStmtArray body;
+} NodeStmtWhile;
+
 typedef struct NodeStmt {
     NodeStmtKind kind;
     union {
@@ -122,6 +135,8 @@ typedef struct NodeStmt {
         NodeStmtExit exit_;
         NodeStmtIf if_;
         NodeStmtElse else_;
+        NodeStmtWhile while_;
+        NodeStmtVchange vchange;
     } as;
 } NodeStmt;
 

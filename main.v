@@ -4,10 +4,10 @@ let c = 5;
 let f = b + c;
 let d = a + b * 2;
 let e = f + d + 1;
-if (e + c == 30) {
-    exit(x);
-
+while(e + c <= 40) {
+    e = e + 1;
 }
+exit(e);
 
 
 

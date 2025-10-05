@@ -28,6 +28,13 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
         emit(g, "   mov qword [rbp - %d], rax\n", off);
         return;
     }
+    if (stmt->kind == NODE_STMT_VCHANGE) {
+        gen_expr_to_rax(g, &stmt->as.let.expr);
+        int slot = lookup_var_slot(g, stmt->as.let.ident.value);
+        int off = slot_to_offset(slot);
+        emit(g, "   mov qword [rbp - %d], rax\n", off);
+        return;
+    }
 
     if (stmt->kind == NODE_STMT_EXIT) {
         gen_expr_to_rax(g, &stmt->as.exit_.expr);
@@ -66,6 +73,30 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
         delete_local_var(g);
         remove_last_block(g);
         emit(g, ".L_else_end_%d:\n", id);
+        return;
+    }
+    if (stmt->kind == NODE_STMT_WHILE) {
+        int id = next_label();
+        emit(g, ".L_While_start_%d:\n", id);
+        gen_expr_to_rax(g, &stmt->as.while_.cond);
+        emit(g, "   mov r10, rax\n");
+        emit(g, "   test r10, r10\n");
+        emit(g, "   je .L_While_end_%d\n", id);
+        StrVec row;
+        kv_init(row);
+        kv_push(StrVec, *g->m_block, row);
+        for (size_t i = 0; i < kv_size(stmt->as.while_.body); ++i) {
+            gen_stmt(g, &kv_A(stmt->as.while_.body, i));
+        }
+        delete_local_var(g);
+        remove_last_block(g);
+
+        // Jump back to start
+        emit(g, "   jmp .L_While_start_%d\n", id);
+
+        // End label
+        emit(g, ".L_While_end_%d:\n", id);
+
         return;
     }
 

@@ -82,6 +82,10 @@ TokenArray tokenize(Token_data* t) {
                 push_token(t, &tokens, token_type_if);
             } else if (strcmp(t->m_buf, "else") == 0) {
                 push_token(t, &tokens, token_type_else);
+            } else if (strcmp(t->m_buf, "for") == 0) {
+                push_token(t, &tokens, token_type_for);
+            } else if (strcmp(t->m_buf, "while") == 0) {
+                push_token(t, &tokens, token_type_while);
             }
             else {
                 push_token_value(t, &tokens, token_type_ident);
@@ -109,6 +113,31 @@ TokenArray tokenize(Token_data* t) {
                          break;
                     } else {
                         push_token(t, &tokens, token_type_eq_kw); break;
+                    }
+                case '<':
+                    if (peek(t,0) != INVALID_CHAR && peek(t,0) == '=') {
+                        push_token(t, &tokens, token_type_less_eq);
+                        consume(t); // consume second equal
+                         break;
+                    } else {
+                        push_token(t, &tokens, token_type_less); break;
+                    }
+                case '>':
+                    if (peek(t,0) != INVALID_CHAR && peek(t,0) == '=') {
+                        push_token(t, &tokens, token_type_more_eq);
+                        consume(t); // consume second equal
+                         break;
+                    } else {
+                        push_token(t, &tokens, token_type_more); break;
+                    }
+                case '!':
+                    if (peek(t,0) != INVALID_CHAR && peek(t,0) == '=') {
+                        push_token(t, &tokens, token_type_not_eq);
+                        consume(t); // consume second equal
+                         break;
+                    } else {
+                        printf("unexcpected !");
+                        exit(1);
                     }
                 case '+': push_token(t, &tokens, token_type_plus); break;
                 case '*': push_token(t, &tokens, token_type_multi); break;

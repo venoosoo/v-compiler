@@ -79,6 +79,8 @@ void print_tokens(TokenArray* tokens) {
             case token_type_not_eq:        printf("not_eq"); break;
             case token_type_and:           printf("and"); break;
             case token_type_or:            printf("or"); break;
+            case token_type_while:            printf("while"); break;
+            case token_type_for:            printf("for"); break;
             case token_empty:              printf("empty"); break;
             default:                       printf("unknown"); break;
         }
@@ -158,6 +160,19 @@ void print_optional_prog(OptionalNodeProg* prog) {
             case NODE_STMT_ELSE:
                 printf("Statement %zu: ELSE\n",i);
                 break;
+            case NODE_STMT_WHILE:
+                printf("Statement %zu: WHILE\n",i);
+                switch (stmt->as.while_.cond.kind) {
+                    case NODE_EXPR_INT_LIT:
+                        printf("    Expr: INT_LIT\n");
+                        break;
+                    case NODE_EXPR_IDENT:
+                        printf("    Expr: IDENT\n");
+                        break;
+                    case NODE_EXPR_BIN:
+                        printf("    Expr: BIN\n");
+                        break;
+                }
         }
     }
 }

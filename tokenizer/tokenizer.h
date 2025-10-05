@@ -37,7 +37,10 @@ typedef enum {
     token_type_not_eq,
     token_type_and,
     token_type_or,
+    token_type_for,
+    token_type_while,
     token_empty,
+
 } TokenType;
 
 typedef struct Token {
