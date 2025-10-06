@@ -74,6 +74,7 @@ void collect_vars(const NodeProg* prog, gen_data* g) {
 void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
     if (!stmt) return;
     if (stmt->kind == NODE_STMT_LET) {
+        printf("debug: %s\n", stmt->as.let.ident.value);
         ensure_var_slot(g, stmt->as.let.ident.value);
         collect_vars_in_expr(&stmt->as.let.expr, g);
     } else if (stmt->kind == NODE_STMT_EXIT) {
@@ -83,6 +84,9 @@ void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
         for (size_t i = 0; i < kv_size(stmt->as.if_.body); ++i) {
             collect_vars_in_stmt(&kv_A(stmt->as.if_.body, i), g);
         }
+    } else if (stmt->kind == NODE_STMT_FOR) {
+        collect_vars_in_stmt(stmt->as.for_.cond1,g);
+        printf("HHEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEy\n");
     }
 }
 
@@ -154,12 +158,18 @@ void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g, int* next_slot) {
         for (size_t i = 0; i < kv_size(stmt->as.if_.body); ++i) {
             assign_slots_in_stmt(&kv_A(stmt->as.if_.body, i), g, next_slot);
         }
+    } else if (stmt->kind == NODE_STMT_FOR) {
+        assign_slots_in_stmt(stmt->as.for_.cond1,g,next_slot++);
+        for (size_t i = 0; i < kv_size(stmt->as.for_.body); ++i) {
+            assign_slots_in_stmt(&kv_A(stmt->as.for_.body, i), g, next_slot);
+        }
     }
 }
 
 
 int lookup_var_slot(gen_data* g, const char* name) {
     khint_t k = str_var_get(g->m_vars, name);
+    printf("name: %s\n",name);
     if (k == kh_end(g->m_vars) || !kh_exist(g->m_vars, k)) {
         fprintf(stderr, "Undefined variable at codegen: %s\n", name);
         exit(1);
@@ -296,7 +306,9 @@ void gen_expr_to_rax(gen_data* g, const NodeExpr* expr) {
         emit(g, "   mov rax, %s\n", expr->as.int_lit.int_lit.value);
         return;
     } else if (expr->kind == NODE_EXPR_IDENT) {
+        printf("debug: %s\n", expr->as.ident.ident.value);
         int slot = lookup_var_slot(g, expr->as.ident.ident.value);
+        printf("slot: %d\n", slot);
         int off = slot_to_offset(slot);
         emit(g, "   mov rax, qword [rbp - %d]\n", off);
         return;

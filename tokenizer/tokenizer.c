@@ -86,8 +86,9 @@ TokenArray tokenize(Token_data* t) {
                 push_token(t, &tokens, token_type_for);
             } else if (strcmp(t->m_buf, "while") == 0) {
                 push_token(t, &tokens, token_type_while);
-            }
-            else {
+            } else if (strcmp(t->m_buf, "for") == 0) {
+                push_token(t, &tokens, token_type_for);
+            } else {
                 push_token_value(t, &tokens, token_type_ident);
             }
 

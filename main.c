@@ -173,6 +173,24 @@ void print_optional_prog(OptionalNodeProg* prog) {
                         printf("    Expr: BIN\n");
                         break;
                 }
+            case NODE_STMT_FOR:
+                printf("Statement %zu: FOR\n",i);
+                switch (stmt->as.for_.cond2.kind) {
+                    case NODE_EXPR_INT_LIT:
+                        printf("    Expr: INT_LIT\n");
+                        break;
+                    case NODE_EXPR_IDENT:
+                        printf("    Expr: IDENT\n");
+                        break;
+                    case NODE_EXPR_BIN:
+                        printf("    Expr: BIN\n");
+                        break;
+                }
+                switch (stmt->as.for_.cond3->kind) {
+                    case NODE_STMT_VCHANGE:
+                        printf("    Stmt: VCHANGE\n");
+                        break;
+                }
         }
     }
 }

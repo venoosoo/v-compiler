@@ -29,8 +29,10 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
         return;
     }
     if (stmt->kind == NODE_STMT_VCHANGE) {
-        gen_expr_to_rax(g, &stmt->as.let.expr);
-        int slot = lookup_var_slot(g, stmt->as.let.ident.value);
+        gen_expr_to_rax(g, &stmt->as.vchange.expr);
+        printf("debug2: %s\n", stmt->as.vchange.ident.value);
+        int slot = lookup_var_slot(g, stmt->as.vchange.ident.value);
+        printf("slot: %d\n", slot);
         int off = slot_to_offset(slot);
         emit(g, "   mov qword [rbp - %d], rax\n", off);
         return;
@@ -99,11 +101,55 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
 
         return;
     }
+    if (stmt->kind == NODE_STMT_FOR) {
+        int id = next_label();
 
-    emit(g, "   ; gen_stmt: unknown stmt kind %d\n", stmt->kind);
+        // --- init ---
+        gen_stmt(g, stmt->as.for_.cond1); // e.g., i = 0
+
+        // --- save fixed loop limit if cond2 uses a variable that can change ---
+        // optional, only if cond2 depends on a variable that might change in body
+        // gen_expr_to_rax(g, &stmt->as.for_.cond2);
+        // emit(g, "   mov qword [rbp - <slot>], rax\n"); // fixed limit
+
+        // --- start label ---
+        emit(g, ".L_For_start_%d:\n", id);
+
+        // --- generate condition check ---
+        // Ideally, cond2 should generate code that leaves the boolean result in rax:
+        // 0 = false, non-zero = true
+        gen_expr_to_rax(g, &stmt->as.for_.cond2);  
+
+        emit(g, "   cmp rax, 0\n");        // compare to 0
+        emit(g, "   je .L_For_end_%d\n", id);  // exit if false
+
+        // --- generate body ---
+        StrVec row;
+        kv_init(row);
+        kv_push(StrVec, *g->m_block, row);
+        for (size_t i = 0; i < kv_size(stmt->as.for_.body); ++i) {
+            gen_stmt(g, &kv_A(stmt->as.for_.body, i));
+        }
+        delete_local_var(g);
+        remove_last_block(g);
+
+        // --- step/iteration ---
+        // this is just a normal statement, e.g., i = i + 1
+        // make sure your VCHANGE generator emits simple 'add' or 'mov' to the loop variable
+        gen_stmt(g, stmt->as.for_.cond3);
+
+        // --- jump back ---
+        emit(g, "   jmp .L_For_start_%d\n", id);
+
+        // --- end label ---
+        emit(g, ".L_For_end_%d:\n", id);
+        return;
+    }
+
+    printf("unkown stmt kind %d\n", stmt->kind);
+    exit(1);
 }
 
-// function for deleting local var when their block ends
 
 
 gen_data* generate_gen_data(const NodeProg* root) {

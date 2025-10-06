@@ -11,18 +11,7 @@ typedef struct var {
     size_t stack_pos;
 } var;
 
-/*
- * Instantiate a khashl map here.
- *
- * - scope: KH_LOCAL (functions are local/static)
- * - table typedef name: str_var_t
- * - prefix (function name prefix): str_var
- * - key type: const char*
- * - value type: var*   <-- we'll store pointers to allocated var
- * - hash/equal: kh_hash_str / kh_eq_str (provided by khashl)
- *
- * NOTE: keep this invocation only in this header (remove any duplicate in .c).
- */
+
 KHASHL_MAP_INIT(KH_LOCAL, str_var_t, str_var,
                 const char*,   /* key type */
                 var*,          /* value type (pointer to var) */

@@ -112,6 +112,7 @@ typedef enum {
     NODE_STMT_IF,
     NODE_STMT_ELSE,
     NODE_STMT_WHILE,
+    NODE_STMT_FOR,
 } NodeStmtKind;
 
 typedef struct NodeStmtIf {
@@ -128,6 +129,13 @@ typedef struct NodeStmtWhile {
     NodeStmtArray body;
 } NodeStmtWhile;
 
+typedef struct NodeStmtFor {
+    NodeStmt* cond1; // local for var init
+    NodeExpr cond2; // stop logic operation
+    NodeStmt* cond3; // expr that goes every iteration
+    NodeStmtArray body;
+} NodeStmtFor;
+
 typedef struct NodeStmt {
     NodeStmtKind kind;
     union {
@@ -136,6 +144,7 @@ typedef struct NodeStmt {
         NodeStmtIf if_;
         NodeStmtElse else_;
         NodeStmtWhile while_;
+        NodeStmtFor for_;
         NodeStmtVchange vchange;
     } as;
 } NodeStmt;

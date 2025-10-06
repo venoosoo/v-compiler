@@ -509,9 +509,7 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         parser_consume(p); // (
         NodeStmtExit stmt_exit;
         // parsing expr inside parentheses
-        printf("in parse_stmt.exit m_index before: %d\n", p->m_index);
         OptionalNodeExpr expr = parse_expr(p);
-        printf("in parse_stmt.exit m_index after: %d\n", p->m_index);
 
         if (!expr.has_value) { fprintf(stderr,"Invalid expression after exit\n"); exit(1); }
         stmt_exit.expr = expr.value;
@@ -523,7 +521,6 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
             fprintf(stderr,"Expected ';'\n"); exit(1);
         }
         parser_consume(p);
-        printf("in parse_stmt.exit m_index end: %d\n", p->m_index);
         NodeStmt node_stmt;
         node_stmt.kind = NODE_STMT_EXIT;
         node_stmt.as.exit_ = stmt_exit;
@@ -566,13 +563,11 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
             stmt_vchange.ident = parser_consume(p);
             parser_consume(p); // consume =
             OptionalNodeExpr expr = parse_expr(p);
-            if (parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_semi) {
-                parser_consume(p);
-            } else {
-                printf("debug: m_index: %d\n", p->m_index);
-                printf("Expected ;\n");
-                exit(1);
+            if (!(parser_peek(p,0).has_value && (parser_peek(p,0).value.type == token_type_semi || parser_peek(p,0).value.type == token_type_close_paren))) {
+                printf("m_index: %d\n", p->m_index);
+                fprintf(stderr,"Expected '; or )'\n"); exit(1);
             }
+            parser_consume(p); // '; or )'
             if (!expr.has_value) { fprintf(stderr,"Invalid expression after let\n"); exit(1); }
             stmt_vchange.expr = expr.value;
             NodeStmt node_stmt;
@@ -612,9 +607,9 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
                 // print context to help debugging: show current token & index
                 OptionalToken cur = parser_peek(p, 0);
                 if (cur.has_value) {
-                    fprintf(stderr, "Failed to parse statement inside else at index %d: token type=%d\n", p->m_index, cur.value.type);
+                    fprintf(stderr, "Failed to parse statement inside if at index %d: token type=%d\n", p->m_index, cur.value.type);
                 } else {
-                    fprintf(stderr, "Failed to parse statement inside else at index %d: no token\n", p->m_index);
+                    fprintf(stderr, "Failed to parse statement inside if at index %d: no token\n", p->m_index);
                 }
                 exit(1);
             }
@@ -669,15 +664,12 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         return result;
     }
     if (t0.has_value && t0.value.type == token_type_while) {
-        printf("parsing while\n");
         parser_consume(p); //consume while
         if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_paren)) {
             fprintf(stderr,"Expected '('\n"); exit(1);
         }
         parser_consume(p); // '('
-        printf("m_index: %d\n", p->m_index);
         OptionalNodeExpr cond = parse_expr(p);
-        printf("m_index: %d\n", p->m_index);
         if (!cond.has_value) { fprintf(stderr,"Invalid expression in while condition\n"); exit(1); }
 
         if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_paren)) {
@@ -700,9 +692,9 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
                 // print context to help debugging: show current token & index
                 OptionalToken cur = parser_peek(p, 0);
                 if (cur.has_value) {
-                    fprintf(stderr, "Failed to parse statement inside else at index %d: token type=%d\n", p->m_index, cur.value.type);
+                    fprintf(stderr, "Failed to parse statement inside while at index %d: token type=%d\n", p->m_index, cur.value.type);
                 } else {
-                    fprintf(stderr, "Failed to parse statement inside else at index %d: no token\n", p->m_index);
+                    fprintf(stderr, "Failed to parse statement inside while at index %d: no token\n", p->m_index);
                 }
                 exit(1);
             }
@@ -723,6 +715,63 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         result.has_value = 1;
         result.value = node_stmt;
         printf("result: %d\n", result.has_value);
+        return result;
+    }
+    if (t0.has_value && t0.value.type == token_type_for) {
+        parser_consume(p); // for 
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_paren)) {
+            fprintf(stderr,"Expected '('\n"); exit(1);
+        }
+        parser_consume(p); // '('
+        OptionalNodeStmt cond1 = parse_stmt(p);
+        OptionalNodeExpr cond2 = parse_expr(p);
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_semi)) {
+            fprintf(stderr,"Expected ';'\n"); exit(1);
+        }
+        parser_consume(p);
+        OptionalNodeStmt cond3 = parse_stmt(p);
+
+        // no checking for ) cause it checking in conditions  
+
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_braces)) {
+            fprintf(stderr,"Expected '{'\n"); exit(1);
+        }
+        parser_consume(p); // '{'
+
+        NodeStmtArray body = {};
+        kv_init(body);
+        while (parser_peek(p,0).has_value && parser_peek(p,0).value.type != token_type_close_braces) {
+            printf("m_index: %d\n", p->m_index);
+            OptionalNodeStmt inner = parse_stmt(p);
+            if (!inner.has_value) {
+                // print context to help debugging: show current token & index
+                OptionalToken cur = parser_peek(p, 0);
+                if (cur.has_value) {
+                    fprintf(stderr, "Failed to parse statement inside for at index %d: token type=%d\n", p->m_index, cur.value.type);
+                } else {
+                    fprintf(stderr, "Failed to parse statement inside for at index %d: no token\n", p->m_index);
+                }
+                exit(1);
+            }
+            printf("m_index22: %d\n", p->m_index);
+            kv_push(NodeStmt, body, inner.value);
+        }
+        if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_braces)) {
+            fprintf(stderr,"Expected '}'\n"); exit(1);
+        }
+        parser_consume(p); // '}'
+        NodeStmtFor n_for;
+        n_for.body = body;
+        n_for.cond1 = malloc(sizeof(NodeStmt));
+        *n_for.cond1 = cond1.value;
+        n_for.cond2 = cond2.value; // stop logic operation
+        n_for.cond3 = malloc(sizeof(NodeStmt)); // expr that goes every iteration
+        *n_for.cond3 = cond3.value;
+        NodeStmt node_stmt;
+        node_stmt.kind = NODE_STMT_FOR;
+        node_stmt.as.for_ = n_for;
+        result.has_value = 1;
+        result.value = node_stmt;
         return result;
     }
 
