@@ -61,7 +61,9 @@ void print_tokens(TokenArray* tokens) {
             case token_type_open_paren:    printf("open_paren"); break;
             case token_type_close_paren:   printf("close_paren"); break;
             case token_type_ident:         printf("ident"); break;
-            case token_type_let_kw:        printf("let_kw"); break;
+            case token_type_int:           printf("int"); break;
+            case token_type_char_t:        printf("char type"); break;
+            case token_type_char_v:        printf("char value"); break; 
             case token_type_eq_kw:         printf("eq_kw"); break;
             case token_type_plus:          printf("plus"); break;
             case token_type_multi:         printf("multi"); break;
@@ -79,8 +81,8 @@ void print_tokens(TokenArray* tokens) {
             case token_type_not_eq:        printf("not_eq"); break;
             case token_type_and:           printf("and"); break;
             case token_type_or:            printf("or"); break;
-            case token_type_while:            printf("while"); break;
-            case token_type_for:            printf("for"); break;
+            case token_type_while:         printf("while"); break;
+            case token_type_for:           printf("for"); break;
             case token_empty:              printf("empty"); break;
             default:                       printf("unknown"); break;
         }
@@ -126,9 +128,9 @@ void print_optional_prog(OptionalNodeProg* prog) {
                 }
                 break;
 
-            case NODE_STMT_LET:
-                printf("Statement %zu: LET\n", i);
-                switch (stmt->as.let.expr.kind) {
+            case NODE_STMT_CHAR:
+                printf("Statement %zu: CHAR\n", i);
+                switch (stmt->as.char_.expr.kind) {
                     case NODE_EXPR_INT_LIT:
                         printf("  Expr: INT_LIT\n");
                         break;
@@ -140,6 +142,9 @@ void print_optional_prog(OptionalNodeProg* prog) {
                         break;
                     case NODE_EXPR_EMPTY:
                         printf("  Expr: EMPTY\n");
+                        break;
+                    case NODE_EXPR_CHAR:
+                        printf("  Expr: CHAR\n");
                         break;
                 }
                 break;

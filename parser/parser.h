@@ -18,6 +18,10 @@ typedef struct NodeExprIntLit {
     Token int_lit;
 } NodeExprIntLit;
 
+typedef struct NodeExprChar {
+    Token char_;
+} NodeExprChar;
+
 typedef struct NodeExprIdent {
     Token ident;
 } NodeExprIdent;
@@ -78,7 +82,8 @@ typedef enum {
     NODE_EXPR_INT_LIT,
     NODE_EXPR_IDENT,
     NODE_EXPR_BIN,
-    NODE_EXPR_EMPTY
+    NODE_EXPR_CHAR,
+    NODE_EXPR_EMPTY,
 } NodeExprKind;
 
 struct NodeExpr {
@@ -86,6 +91,7 @@ struct NodeExpr {
     union {
         NodeExprIntLit int_lit;
         NodeExprIdent ident;
+        NodeExprChar char_;
         BinExpr* bin;
     } as;
 };
@@ -94,10 +100,16 @@ typedef struct NodeStmtExit {
     NodeExpr expr;
 } NodeStmtExit;
 
-typedef struct NodeStmtLet {
+
+typedef struct NodeStmtChar {
     Token ident;
     NodeExpr expr;
-} NodeStmtLet;
+} NodeStmtChar;
+
+typedef struct NodeStmtInt {
+    Token ident;
+    NodeExpr expr;
+} NodeStmtInt;
 
 
 typedef struct NodeStmtVchange {
@@ -107,7 +119,8 @@ typedef struct NodeStmtVchange {
 
 typedef enum {
     NODE_STMT_EXIT,
-    NODE_STMT_LET,
+    NODE_STMT_CHAR,
+    NODE_STMT_INT,
     NODE_STMT_VCHANGE,
     NODE_STMT_IF,
     NODE_STMT_ELSE,
@@ -139,7 +152,8 @@ typedef struct NodeStmtFor {
 typedef struct NodeStmt {
     NodeStmtKind kind;
     union {
-        NodeStmtLet let;
+        NodeStmtChar char_;
+        NodeStmtInt int_;
         NodeStmtExit exit_;
         NodeStmtIf if_;
         NodeStmtElse else_;

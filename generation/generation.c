@@ -1,7 +1,6 @@
 
 #include "./generation.h"
 #include "../libs/sds.h"
-#include "../libs/khashl.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,37 +8,65 @@
 #include "./helper/helper.h"
 
 
+void handle_vars(gen_data* g, const NodeStmt* stmt) {
+    char* s = "";
+    int int_char_check = 0;
+    switch (stmt->kind) {
+        case NODE_STMT_INT: 
+            s = strdup(stmt->as.int_.ident.value); 
+            if (stmt->as.int_.expr.kind == NODE_EXPR_CHAR) {
+                printf("error: cannot assign value of type 'char' to variable of type 'int'\n");
+                exit(1);
+            }
+            break;
+        case NODE_STMT_CHAR: s = strdup(stmt->as.char_.ident.value); break;
+    }
+    if (kv_size(*g->m_block) > 0) {
+        size_t last_row_index = kv_size(*g->m_block) - 1;
+        StrVec *last_row = &kv_A(*g->m_block, last_row_index); // pointer to real inner vector
+        if (!s || s == "") { perror("strdup"); exit(1); }
+        kv_push(char*, *last_row, s); // push into the actual inner vector
+    }
+
+    switch(stmt->kind) {
+        case NODE_STMT_INT: {
+            gen_expr_to_rax(g, &stmt->as.int_.expr, stmt->kind);
+            int slot = lookup_var_slot(g, stmt->as.int_.ident.value);
+            int off = slot_to_offset(g,slot);
+            emit(g, "   mov dword [rbp - %d], eax\n", off);
+            return;
+        }
+        case NODE_STMT_CHAR: {
+            gen_expr_to_rax(g, &stmt->as.char_.expr, stmt->kind);
+            int slot = lookup_var_slot(g, stmt->as.char_.ident.value);
+            int off = slot_to_offset(g,slot);
+            emit(g, "   mov byte [rbp - %d], al\n", off);
+            return;
+        }
+    }
+}
 
 void gen_stmt(gen_data* g, const NodeStmt* stmt) {
     if (!stmt) return;
 
-    if (stmt->kind == NODE_STMT_LET) {
-
-        if (kv_size(*g->m_block) > 0) {
-            size_t last_row_index = kv_size(*g->m_block) - 1;
-            StrVec *last_row = &kv_A(*g->m_block, last_row_index); // pointer to real inner vector
-            char *s = strdup(stmt->as.let.ident.value);
-            if (!s) { perror("strdup"); exit(1); }
-            kv_push(char*, *last_row, s); // push into the actual inner vector
-        }
-        gen_expr_to_rax(g, &stmt->as.let.expr);
-        int slot = lookup_var_slot(g, stmt->as.let.ident.value);
-        int off = slot_to_offset(slot);
-        emit(g, "   mov qword [rbp - %d], rax\n", off);
+    if (stmt->kind == NODE_STMT_INT) {
+        handle_vars(g,stmt);
+        return;
+    } 
+    if (stmt->kind == NODE_STMT_CHAR) {
+        handle_vars(g,stmt);
         return;
     }
     if (stmt->kind == NODE_STMT_VCHANGE) {
-        gen_expr_to_rax(g, &stmt->as.vchange.expr);
-        printf("debug2: %s\n", stmt->as.vchange.ident.value);
+        gen_expr_to_rax(g, &stmt->as.vchange.expr, stmt->kind);
         int slot = lookup_var_slot(g, stmt->as.vchange.ident.value);
-        printf("slot: %d\n", slot);
-        int off = slot_to_offset(slot);
+        int off = slot_to_offset(g,slot);
         emit(g, "   mov qword [rbp - %d], rax\n", off);
         return;
     }
 
     if (stmt->kind == NODE_STMT_EXIT) {
-        gen_expr_to_rax(g, &stmt->as.exit_.expr);
+        gen_expr_to_rax(g, &stmt->as.exit_.expr, stmt->kind);
         emit(g, "   mov rdi, rax\n");
         emit(g, "   mov rax, 60\n");
         emit(g, "   syscall\n");
@@ -48,7 +75,7 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
 
     if (stmt->kind == NODE_STMT_IF) {
         // evaluate condition -> rax ; test ; je skip
-        gen_expr_to_rax(g, &stmt->as.if_.cond);
+        gen_expr_to_rax(g, &stmt->as.if_.cond, stmt->kind);
         emit(g, "   test rax, rax\n");
         int id = next_label();
         emit(g, "   je .L_if_end_%d\n", id);
@@ -80,7 +107,7 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
     if (stmt->kind == NODE_STMT_WHILE) {
         int id = next_label();
         emit(g, ".L_While_start_%d:\n", id);
-        gen_expr_to_rax(g, &stmt->as.while_.cond);
+        gen_expr_to_rax(g, &stmt->as.while_.cond, stmt->kind);
         emit(g, "   mov r10, rax\n");
         emit(g, "   test r10, r10\n");
         emit(g, "   je .L_While_end_%d\n", id);
@@ -107,23 +134,13 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
         // --- init ---
         gen_stmt(g, stmt->as.for_.cond1); // e.g., i = 0
 
-        // --- save fixed loop limit if cond2 uses a variable that can change ---
-        // optional, only if cond2 depends on a variable that might change in body
-        // gen_expr_to_rax(g, &stmt->as.for_.cond2);
-        // emit(g, "   mov qword [rbp - <slot>], rax\n"); // fixed limit
-
-        // --- start label ---
         emit(g, ".L_For_start_%d:\n", id);
 
-        // --- generate condition check ---
-        // Ideally, cond2 should generate code that leaves the boolean result in rax:
-        // 0 = false, non-zero = true
-        gen_expr_to_rax(g, &stmt->as.for_.cond2);  
+        gen_expr_to_rax(g, &stmt->as.for_.cond2, stmt->kind);  
 
         emit(g, "   cmp rax, 0\n");        // compare to 0
         emit(g, "   je .L_For_end_%d\n", id);  // exit if false
 
-        // --- generate body ---
         StrVec row;
         kv_init(row);
         kv_push(StrVec, *g->m_block, row);
@@ -133,9 +150,7 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
         delete_local_var(g);
         remove_last_block(g);
 
-        // --- step/iteration ---
-        // this is just a normal statement, e.g., i = i + 1
-        // make sure your VCHANGE generator emits simple 'add' or 'mov' to the loop variable
+    
         gen_stmt(g, stmt->as.for_.cond3);
 
         // --- jump back ---
@@ -163,11 +178,11 @@ gen_data* generate_gen_data(const NodeProg* root) {
     g->m_prog = root;
     g->m_stack_pos = 0;
     g->m_output = sdsempty();
-    Str2DVec vec2d;
     g->m_block = malloc(sizeof(Str2DVec));
     kv_init(*g->m_block);
 
-    g->m_vars = str_var_init();
+    g->m_vars = malloc(sizeof(StackVec));
+    kv_init(*g->m_vars);
     if (!g->m_vars) { free(g); return NULL; }
 
     // 1) collect var keys
@@ -176,7 +191,7 @@ gen_data* generate_gen_data(const NodeProg* root) {
     // 2) assign slots deterministically in source order (including nested lets)
     int next_slot = 0;
     for (size_t i = 0; i < kv_size(root->stmt); ++i) {
-        assign_slots_in_stmt(&kv_A(root->stmt, i), g, &next_slot);
+        assign_slots_in_stmt(&kv_A(root->stmt, i),g);
     }
 
     int slots = next_slot;

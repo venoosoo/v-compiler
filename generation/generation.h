@@ -1,23 +1,29 @@
 #pragma once
 
 #include "../libs/sds.h"
-#include "../libs/khashl.h"
 #include "../parser/parser.h"
 #include <string.h>
 #include <stdlib.h>
 
-/* value struct (typedef so name is simple) */
 typedef struct var {
     size_t stack_pos;
 } var;
 
 
-KHASHL_MAP_INIT(KH_LOCAL, str_var_t, str_var,
-                const char*,   /* key type */
-                var*,          /* value type (pointer to var) */
-                kh_hash_str,   /* string hash provided by khashl */
-                kh_eq_str)     /* string equality provided by khashl */
+typedef struct {
+    TokenType kind;       // token_type_int_lit, token_type_char_lit
+    size_t size;          // size in bytes
+    const char *asm_size; // "byte", "qword", etc.
+} VarTypeInfo;
+
+
+typedef struct stack_vars {
+    char* name;
+    Token type;
+} stack_vars;
+
 typedef kvec_t(char*) StrVec;
+typedef kvec_t(stack_vars) StackVec;
 // vector of vector-of-strings
 typedef kvec_t(StrVec) Str2DVec;
 /* gen_data */
@@ -25,7 +31,7 @@ typedef struct gen_data {
     const NodeProg* m_prog;   /* pointer to parsed program */
     size_t m_stack_pos;
     sds m_output;
-    str_var_t *m_vars;        /* map instance pointer (returned by str_var_init()) */
+    StackVec *m_vars;    // unordered map of all vars
     Str2DVec *m_block; // for local visibility
 } gen_data;
 

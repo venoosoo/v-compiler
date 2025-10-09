@@ -73,11 +73,8 @@ TokenArray tokenize(Token_data* t) {
             while (isalnum(peek(t,0))) {
                 push_back(t, consume(t));
             }
-
             if (strcmp(t->m_buf, "exit") == 0) {
                 push_token(t, &tokens, token_type_exit_kw);
-            } else if (strcmp(t->m_buf, "let") == 0) {
-                push_token(t, &tokens, token_type_let_kw);
             } else if (strcmp(t->m_buf, "if") == 0) {
                 push_token(t, &tokens, token_type_if);
             } else if (strcmp(t->m_buf, "else") == 0) {
@@ -88,6 +85,10 @@ TokenArray tokenize(Token_data* t) {
                 push_token(t, &tokens, token_type_while);
             } else if (strcmp(t->m_buf, "for") == 0) {
                 push_token(t, &tokens, token_type_for);
+            } else if (strcmp(t->m_buf, "int") == 0) {
+                push_token(t, &tokens, token_type_int);
+            } else if (strcmp(t->m_buf, "char") == 0) {
+                push_token(t, &tokens, token_type_char_t);
             } else {
                 push_token_value(t, &tokens, token_type_ident);
             }
@@ -140,13 +141,17 @@ TokenArray tokenize(Token_data* t) {
                         printf("unexcpected !");
                         exit(1);
                     }
+                case '\'':
+                    push_back(t, consume(t));
+                    consume(t);
+                    push_token_value(t, &tokens, token_type_char_v);
+                    break;
                 case '+': push_token(t, &tokens, token_type_plus); break;
                 case '*': push_token(t, &tokens, token_type_multi); break;
                 case '/': push_token(t, &tokens, token_type_divide); break;
                 case '-': push_token(t, &tokens, token_type_minus); break;
                 case '{': push_token(t, &tokens, token_type_open_braces); break;
-                case '}': push_token(t, &tokens, token_type_close_braces); break;
-                default: break; // ignore whitespace or unknown chars
+                case '}': push_token(t, &tokens, token_type_close_braces); break;                default: break; // ignore whitespace or unknown chars
             }
         }
     }

@@ -430,7 +430,7 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
     OptionalNodeExpr result = {0};
     OptionalToken t = parser_peek(p, 0);
     if (!t.has_value) return result;
-    if (t.value.type == token_type_int_lit || t.value.type == token_type_ident) {
+    if ((t.value.type == token_type_int_lit || t.value.type == token_type_char_v) || t.value.type == token_type_ident) {
         OptionalToken t1 = parser_peek(p, 1);
         OptionalToken t2 = parser_peek(p, 2);
 
@@ -438,7 +438,7 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
         if (t1.has_value && t2.has_value &&
             (t1.value.type == token_type_plus || t1.value.type == token_type_minus ||
              t1.value.type == token_type_multi || t1.value.type == token_type_divide) &&
-            (t2.value.type == token_type_int_lit || t2.value.type == token_type_ident)) {
+            ((t2.value.type == token_type_int_lit || t2.value.type == token_type_int_lit) || t2.value.type == token_type_ident)) {
 
             OptionalBinExpr bin = parse_bin_stmt(p);
             if (!bin.has_value) {
@@ -480,10 +480,15 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
             return result;
         }
         else {
+            printf("t_val: %d\n", t.value.type);
             NodeExpr expr;
             if (t.value.type == token_type_int_lit) {
                 expr.kind = NODE_EXPR_INT_LIT;
                 expr.as.int_lit.int_lit = parser_consume(p);
+            } else if (t.value.type == token_type_char_v) {
+                printf("HEY\n");
+                expr.kind = NODE_EXPR_CHAR;
+                expr.as.char_.char_ = parser_consume(p);
             } else {
                 expr.kind = NODE_EXPR_IDENT;
                 expr.as.ident.ident = parser_consume(p);
@@ -510,7 +515,6 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         NodeStmtExit stmt_exit;
         // parsing expr inside parentheses
         OptionalNodeExpr expr = parse_expr(p);
-
         if (!expr.has_value) { fprintf(stderr,"Invalid expression after exit\n"); exit(1); }
         stmt_exit.expr = expr.value;
         if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_close_paren)) {
@@ -531,14 +535,13 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
 
     OptionalToken t1 = parser_peek(p, 1);
     OptionalToken t2 = parser_peek(p, 2);
-    if (t0.has_value && t0.value.type == token_type_let_kw &&
+    if (t0.has_value && (t0.value.type == token_type_int || t0.value.type == token_type_char_t) &&
         t1.has_value && t1.value.type == token_type_ident &&
         t2.has_value && t2.value.type == token_type_eq_kw) {
-
-        parser_consume(p); // consume let
-        NodeStmtLet stmt_let;
-        stmt_let.ident = parser_consume(p);
+        Token type = parser_consume(p);
+        Token ident = parser_consume(p);
         parser_consume(p); // consume =
+        printf("m_index: %d\n", p->m_index);
         OptionalNodeExpr expr = parse_expr(p);
         if (parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_semi) {
             parser_consume(p);
@@ -548,10 +551,16 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
             exit(1);
         }
         if (!expr.has_value) { fprintf(stderr,"Invalid expression after let\n"); exit(1); }
-        stmt_let.expr = expr.value;
         NodeStmt node_stmt;
-        node_stmt.kind = NODE_STMT_LET;
-        node_stmt.as.let = stmt_let;
+        if (type.type == token_type_int) {
+            node_stmt.kind = NODE_STMT_INT;
+            node_stmt.as.int_.ident = ident;
+            node_stmt.as.int_.expr = expr.value;
+        } else if (type.type == token_type_char_t) {
+            node_stmt.kind = NODE_STMT_CHAR;
+            node_stmt.as.char_.ident = ident;
+            node_stmt.as.char_.expr = expr.value;
+        }
         result.has_value = 1;
         result.value = node_stmt;
         return result;

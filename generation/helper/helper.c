@@ -1,10 +1,10 @@
 #include "./helper.h"
 #include "../../libs/sds.h"
-#include "../../libs/khashl.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+
 
 
 
@@ -18,8 +18,16 @@ void emit(gen_data* g, const char* fmt, ...) {
     sdsfree(out);
 }
 
-int slot_to_offset(int slot_index) {
-    return 8 * (slot_index + 1);
+int slot_to_offset(gen_data* g,int slot_index) {
+    int size = 0;
+    for(int i = 0; i <= slot_index; i++) {
+        NodeStmt stmt = kv_A(g->m_prog->stmt, i);
+        switch(stmt.kind) {
+            case NODE_STMT_INT: size+=8; break;
+            case NODE_STMT_CHAR: size +=1; break;
+        }
+    }
+    return size;
 }
 int __label_counter = 0;
 int next_label(void) { return __label_counter++; }
@@ -33,34 +41,22 @@ int next_label(void) { return __label_counter++; }
 // ------------------------
 void ensure_var_slot(gen_data* g, const char* name) {
     if (!g || !name) return;
-    khint_t k = str_var_get(g->m_vars, name);
-    if (k != kh_end(g->m_vars)) return; // already present
 
-    int absent = 0;
-    k = str_var_put(g->m_vars, name, &absent);
-    if (k == kh_end(g->m_vars)) { // proper failure check
-        fprintf(stderr, "Failed to insert var %s\n", name);
-        exit(1);
-    }
-
-    if (absent) {
-        kh_key(g->m_vars, k) = strdup(name);
-        if (!kh_key(g->m_vars, k)) { perror("strdup"); str_var_del(g->m_vars, k); exit(1); }
-
-        var* vp = malloc(sizeof(var));
-        if (!vp) { perror("malloc"); str_var_del(g->m_vars, k); exit(1); }
-        vp->stack_pos = -1;
-        kh_val(g->m_vars, k) = vp;
-    } else {
-        var* vp = kh_val(g->m_vars, k);
-        if (!vp) {
-            vp = malloc(sizeof(var));
-            if (!vp) { perror("malloc"); exit(1); }
-            vp->stack_pos = -1;
-            kh_val(g->m_vars, k) = vp;
+    // Check if the variable already exists
+    for (size_t i = 0; i < kv_size(*g->m_vars); i++) {
+        if (strcmp(kv_A(*g->m_vars, i).name, name) == 0) {
+            return; // already present
         }
     }
+
+    // Variable not found, add new slot
+    stack_vars sv;
+    sv.name = strdup(name);
+    if (!sv.name) { perror("strdup"); exit(1); }
+
+    kv_push(stack_vars, *g->m_vars, sv);
 }
+
 
 void collect_vars(const NodeProg* prog, gen_data* g) {
     if (!prog || !g) return;
@@ -73,10 +69,13 @@ void collect_vars(const NodeProg* prog, gen_data* g) {
 
 void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
     if (!stmt) return;
-    if (stmt->kind == NODE_STMT_LET) {
-        printf("debug: %s\n", stmt->as.let.ident.value);
-        ensure_var_slot(g, stmt->as.let.ident.value);
-        collect_vars_in_expr(&stmt->as.let.expr, g);
+    if (stmt->kind == NODE_STMT_INT) {
+        ensure_var_slot(g, stmt->as.int_.ident.value);
+        collect_vars_in_expr(&stmt->as.int_.expr, g);
+    } else if (stmt->kind == NODE_STMT_CHAR) {
+        printf("debug: %s\n", stmt->as.char_.ident.value);
+        ensure_var_slot(g, stmt->as.char_.ident.value);
+        collect_vars_in_expr(&stmt->as.char_.expr, g);
     } else if (stmt->kind == NODE_STMT_EXIT) {
         collect_vars_in_expr(&stmt->as.exit_.expr, g);
     } else if (stmt->kind == NODE_STMT_IF) {
@@ -85,8 +84,7 @@ void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
             collect_vars_in_stmt(&kv_A(stmt->as.if_.body, i), g);
         }
     } else if (stmt->kind == NODE_STMT_FOR) {
-        collect_vars_in_stmt(stmt->as.for_.cond1,g);
-        printf("HHEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEy\n");
+        collect_vars_in_stmt(stmt->as.for_.cond1,g);    
     }
 }
 
@@ -137,47 +135,54 @@ void collect_vars_in_expr(const NodeExpr* expr, gen_data* g) {
 }
 
 
-void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g, int* next_slot) {
-    if (!stmt || !g || !next_slot) return;
-    if (stmt->kind == NODE_STMT_LET) {
-        const char* name = stmt->as.let.ident.value;
-        ensure_var_slot(g, name); // make sure entry exists
-        khint_t k = str_var_get(g->m_vars, name);
-        if (k == kh_end(g->m_vars)) return; // shouldn't happen
-        var* vp = kh_val(g->m_vars, k);
-        if (!vp) return;
-        if (vp->stack_pos == -1) {
-            vp->stack_pos = (*next_slot)++;
-        }
-        // also assign slots inside the initializer expression (if it contains nested lets via weird ASTs)
-        collect_vars_in_expr(&stmt->as.let.expr, g);
+void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g) {
+    if (!stmt || !g) return;
+    //TODO: refactor it so i dont create this shit for every type
+    if (stmt->kind == NODE_STMT_INT) {
+        const char* name = stmt->as.int_.ident.value;
+        ensure_var_slot(g, name);
+        collect_vars_in_expr(&stmt->as.int_.expr, g);
+
+    } else if (stmt->kind == NODE_STMT_CHAR) {
+        const char* name = stmt->as.char_.ident.value;
+        ensure_var_slot(g, name);
+        collect_vars_in_expr(&stmt->as.char_.expr, g);
+
     } else if (stmt->kind == NODE_STMT_EXIT) {
         collect_vars_in_expr(&stmt->as.exit_.expr, g);
+
     } else if (stmt->kind == NODE_STMT_IF) {
-        // assign slots for nested body in-order
         for (size_t i = 0; i < kv_size(stmt->as.if_.body); ++i) {
-            assign_slots_in_stmt(&kv_A(stmt->as.if_.body, i), g, next_slot);
+            assign_slots_in_stmt(&kv_A(stmt->as.if_.body, i), g);
         }
+
     } else if (stmt->kind == NODE_STMT_FOR) {
-        assign_slots_in_stmt(stmt->as.for_.cond1,g,next_slot++);
+        if (stmt->as.for_.cond1)
+            assign_slots_in_stmt(stmt->as.for_.cond1, g);
+        if (stmt->as.for_.cond3)
+            assign_slots_in_stmt(stmt->as.for_.cond3, g);
         for (size_t i = 0; i < kv_size(stmt->as.for_.body); ++i) {
-            assign_slots_in_stmt(&kv_A(stmt->as.for_.body, i), g, next_slot);
+            assign_slots_in_stmt(&kv_A(stmt->as.for_.body, i), g);
         }
     }
 }
 
 
 int lookup_var_slot(gen_data* g, const char* name) {
-    khint_t k = str_var_get(g->m_vars, name);
-    printf("name: %s\n",name);
-    if (k == kh_end(g->m_vars) || !kh_exist(g->m_vars, k)) {
-        fprintf(stderr, "Undefined variable at codegen: %s\n", name);
+    if (!g || !g->m_vars || !name) {
+        fprintf(stderr, "Invalid arguments to lookup_var_slot\n");
         exit(1);
     }
-    var* vp = kh_val(g->m_vars, k);
-    if (!vp) { fprintf(stderr, "Internal error: var NULL for %s\n", name); exit(1); }
-    if (vp->stack_pos < 0) { fprintf(stderr, "Internal error: var slot unassigned for %s\n", name); exit(1); }
-    return vp->stack_pos;
+
+    StackVec* vars = g->m_vars;
+    for (size_t i = 0; i < kv_size(*vars); i++) {
+        if (strcmp(kv_A(*vars, i).name, name) == 0) {
+            return (int)i;  // index in the array is the slot
+        }
+    }
+
+    fprintf(stderr, "Undefined variable at codegen: %s\n", name);
+    exit(1);
 }
 
 // Evaluate a BindExprRec into rax
@@ -190,7 +195,7 @@ void gen_bindexpr_to_rax(gen_data* g, const BindExprRec rec) {
             return;
         } else if (n->kind == NODE_EXPR_IDENT) {
             int slot = lookup_var_slot(g, n->as.ident.ident.value);
-            int off = slot_to_offset(slot);
+            int off = slot_to_offset(g,slot);
             emit(g, "   mov rax, qword [rbp - %d]\n", off);
             return;
         } else if (n->kind == NODE_EXPR_BIN && n->as.bin) {
@@ -300,23 +305,35 @@ void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
 
 
 // Evaluate NodeExpr (result in rax)
-void gen_expr_to_rax(gen_data* g, const NodeExpr* expr) {
+void gen_expr_to_rax(gen_data* g, const NodeExpr* expr, NodeStmtKind kind) {
     if (expr->kind == NODE_EXPR_EMPTY) { emit(g, "   ; gen_expr: NULL\n"); return; }
     if (expr->kind == NODE_EXPR_INT_LIT) {
-        emit(g, "   mov rax, %s\n", expr->as.int_lit.int_lit.value);
+        if (kind == NODE_STMT_INT) {
+            emit(g, "   mov eax, %s\n", expr->as.int_lit.int_lit.value);
+        } else if (kind == NODE_STMT_CHAR) {
+            emit(g, "   mov al, %s\n", expr->as.char_.char_.value);
+        }
         return;
     } else if (expr->kind == NODE_EXPR_IDENT) {
-        printf("debug: %s\n", expr->as.ident.ident.value);
         int slot = lookup_var_slot(g, expr->as.ident.ident.value);
-        printf("slot: %d\n", slot);
-        int off = slot_to_offset(slot);
-        emit(g, "   mov rax, qword [rbp - %d]\n", off);
+        int off = slot_to_offset(g,slot);
+        if (kind == NODE_STMT_INT) {
+            emit(g, "   mov eax, qword [rbp - %d]\n", off);
+        } else if (kind == NODE_STMT_CHAR) {
+            emit(g, "   mov al, byte [rbp - %d]\n", off);
+        }
         return;
     } else if (expr->kind == NODE_EXPR_BIN) {
         gen_binexpr_to_rax(g, expr->as.bin);
         return;
+    } else if (expr->kind == NODE_EXPR_CHAR) {
+        emit(g, "   mov al, %d\n", (int)*expr->as.char_.char_.value);
+        printf("value: %s\n", expr->as.char_.char_.value);
+        printf("num: %d\n", (int)*expr->as.char_.char_.value);
+        return;
     } else {
-        emit(g, "   ; gen_expr: unknown kind %d\n", expr->kind);
+        printf("gen_expr: unknown kind %d\n", expr->kind);
+        exit(1);
     }
 }
 
@@ -334,24 +351,33 @@ void delete_local_var(gen_data *g) {
     for (size_t i = 0; i < kv_size(*last_block); i++) {
         char *key = kv_A(*last_block, i);
 
-        // Try to find key in hashmap
-        khint_t k = str_var_get(g->m_vars, key);
-        if (k == kh_end(g->m_vars)) {
-            fprintf(stderr, "Error: key '%s' not found in hashmap\n", key);
+        // Search for key in StackVec
+        size_t j;
+        int found = 0;
+        for (j = 0; j < kv_size(*g->m_vars); j++) {
+            if (strcmp(kv_A(*g->m_vars, j).name, key) == 0) {
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            fprintf(stderr, "Error: key '%s' not found in m_vars\n", key);
             exit(EXIT_FAILURE);
         }
 
-        // free stored key (we strdup'ed it in ensure_var_slot)
-        char *stored_key = kh_key(g->m_vars, k);
-        if (stored_key) free(stored_key);
+        // free name string
+        free(kv_A(*g->m_vars, j).name);
 
-        // free value struct
-        var* vp = kh_val(g->m_vars, k);
-        if (vp) free(vp);
-
-        // remove entry from hashmap
-        str_var_del(g->m_vars, k);
+        // remove from StackVec by shifting elements
+        for (size_t k = j; k + 1 < kv_size(*g->m_vars); k++) {
+            kv_A(*g->m_vars, k) = kv_A(*g->m_vars, k + 1);
+        }
+        kv_pop(*g->m_vars); // reduce size by 1
     }
+
+    // remove the last block
+    kv_pop(*blocks);
 }
 
 
