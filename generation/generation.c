@@ -19,16 +19,43 @@ void handle_vars(gen_data* g, const NodeStmt* stmt) {
                 exit(1);
             }
             break;
+        case NODE_STMT_SHORT: 
+            s = strdup(stmt->as.short_.ident.value); 
+            if (stmt->as.short_.expr.kind == NODE_EXPR_CHAR) {
+                printf("error: cannot assign value of type 'char' to variable of type 'int'\n");
+                exit(1);
+            }
+            break;
+        case NODE_STMT_LONG: 
+            s = strdup(stmt->as.long_.ident.value); 
+            if (stmt->as.long_.expr.kind == NODE_EXPR_CHAR) {
+                printf("error: cannot assign value of type 'char' to variable of type 'int'\n");
+                exit(1);
+            }
+            break;
         case NODE_STMT_CHAR: s = strdup(stmt->as.char_.ident.value); break;
     }
+    // pushing the var for block visibility
     if (kv_size(*g->m_block) > 0) {
         size_t last_row_index = kv_size(*g->m_block) - 1;
-        StrVec *last_row = &kv_A(*g->m_block, last_row_index); // pointer to real inner vector
+        StrVec *last_row = &kv_A(*g->m_block, last_row_index);
         if (!s || s == "") { perror("strdup"); exit(1); }
-        kv_push(char*, *last_row, s); // push into the actual inner vector
+        kv_push(char*, *last_row, s); 
     }
 
     switch(stmt->kind) {
+        case NODE_STMT_SHORT: {
+            gen_expr_to_rax(g,&stmt->as.short_.expr, stmt->kind);
+            int slot = lookup_var_slot(g, stmt->as.short_.ident.value);
+            int off = slot_to_offset(g,slot);
+            emit(g, "   mov word [rbp - %d], ax\n", off);
+        }
+        case NODE_STMT_LONG: {
+            gen_expr_to_rax(g,&stmt->as.long_.expr, stmt->kind);
+            int slot = lookup_var_slot(g, stmt->as.long_.ident.value);
+            int off = slot_to_offset(g,slot);
+            emit(g, "   mov qword [rbp - %d], rax\n", off);
+        }
         case NODE_STMT_INT: {
             gen_expr_to_rax(g, &stmt->as.int_.expr, stmt->kind);
             int slot = lookup_var_slot(g, stmt->as.int_.ident.value);
@@ -48,6 +75,15 @@ void handle_vars(gen_data* g, const NodeStmt* stmt) {
 
 void gen_stmt(gen_data* g, const NodeStmt* stmt) {
     if (!stmt) return;
+
+    if (stmt->kind == NODE_STMT_SHORT) {
+        handle_vars(g,stmt);
+        return;
+    } 
+    if (stmt->kind == NODE_STMT_LONG) {
+        handle_vars(g,stmt);
+        return;
+    } 
 
     if (stmt->kind == NODE_STMT_INT) {
         handle_vars(g,stmt);

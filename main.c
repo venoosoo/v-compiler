@@ -254,8 +254,16 @@ int main(int argc, char *argv[]) {
 
     printf("compiled\n");
 
-    system("nasm -felf64 main.asm");
-    system("ld -o v main.o");
+    if (system("nasm -felf64 main.asm") != 0) {
+        perror("nasm failed");
+        return EXIT_FAILURE;
+    }
+
+    /* Link using gcc so libc and CRT are included automatically */
+    if (system("ld main.o -o v") != 0) {
+        perror("link failed");
+        return EXIT_FAILURE;
+    }
 
 
 

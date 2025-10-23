@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "./binstmt/binstmt.h"
+#include <stdbool.h>
 // forward declaration implemented in binstmt.c
 extern BindExprRec parse_bin_stmt_rec(Parser_data* p, BinExpr* top, int ptr, const int ptr_max);
 
@@ -31,6 +32,13 @@ OptionalToken parser_peek(Parser_data* p, int offset) {
         result.value = kv_A(p->m_tokens, idx);
     }
     return result;
+}
+
+bool is_type(TokenType type) {
+    return type == token_type_char_t ||
+           type == token_type_int ||
+           type == token_type_short ||
+           type == token_type_long;
 }
 
 
@@ -482,6 +490,7 @@ OptionalNodeExpr parse_expr(Parser_data* p) {
         else {
             printf("t_val: %d\n", t.value.type);
             NodeExpr expr;
+
             if (t.value.type == token_type_int_lit) {
                 expr.kind = NODE_EXPR_INT_LIT;
                 expr.as.int_lit.int_lit = parser_consume(p);
@@ -535,13 +544,14 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
 
     OptionalToken t1 = parser_peek(p, 1);
     OptionalToken t2 = parser_peek(p, 2);
-    if (t0.has_value && (t0.value.type == token_type_int || t0.value.type == token_type_char_t) &&
+
+
+    if (t0.has_value && is_type(t0.value.type) &&
         t1.has_value && t1.value.type == token_type_ident &&
         t2.has_value && t2.value.type == token_type_eq_kw) {
         Token type = parser_consume(p);
         Token ident = parser_consume(p);
         parser_consume(p); // consume =
-        printf("m_index: %d\n", p->m_index);
         OptionalNodeExpr expr = parse_expr(p);
         if (parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_semi) {
             parser_consume(p);
@@ -552,7 +562,16 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         }
         if (!expr.has_value) { fprintf(stderr,"Invalid expression after let\n"); exit(1); }
         NodeStmt node_stmt;
-        if (type.type == token_type_int) {
+        if (type.type == token_type_short) {
+            node_stmt.kind = NODE_STMT_SHORT;
+            node_stmt.as.short_.ident = ident;
+            node_stmt.as.short_.expr = expr.value;
+        } else if (type.type == token_type_long) {
+            node_stmt.kind = NODE_STMT_LONG;
+            node_stmt.as.long_.ident = ident;
+            node_stmt.as.long_.expr = expr.value;
+        }
+        else if (type.type == token_type_int) {
             node_stmt.kind = NODE_STMT_INT;
             node_stmt.as.int_.ident = ident;
             node_stmt.as.int_.expr = expr.value;
@@ -795,7 +814,7 @@ OptionalNodeProg parse_prog(Parser_data* p) {
 
     while (parser_peek(p,0).has_value) {
         OptionalNodeStmt stmt = parse_stmt(p);
-        if (!stmt.has_value) { fprintf(stderr,"Failed to parse statement\n"); exit(1); }
+        if (!stmt.has_value) { fprintf(stderr,"Failed to parse statement\n"); printf("m_index: %d\n", p->m_index); exit(1); }
         kv_push(NodeStmt, result.value.stmt, stmt.value);
     }
 

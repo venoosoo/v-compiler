@@ -11,7 +11,7 @@ SRC = main.c \
       tokenizer/tokenizer.c \
       generation/generation.c \
       generation/helper/helper.c \
-      libs/sds.c  \
+      libs/sds.c  
 
 # Object files
 OBJ = $(SRC:.c=.o)

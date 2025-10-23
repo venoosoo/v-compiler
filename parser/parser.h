@@ -111,6 +111,16 @@ typedef struct NodeStmtInt {
     NodeExpr expr;
 } NodeStmtInt;
 
+typedef struct NodeStmtShort {
+    Token ident;
+    NodeExpr expr;
+} NodeStmtShort;
+
+typedef struct NodeStmtLong {
+    Token ident;
+    NodeExpr expr;
+} NodeStmtLong;
+
 
 typedef struct NodeStmtVchange {
     Token ident;
@@ -121,6 +131,8 @@ typedef enum {
     NODE_STMT_EXIT,
     NODE_STMT_CHAR,
     NODE_STMT_INT,
+    NODE_STMT_SHORT,
+    NODE_STMT_LONG,
     NODE_STMT_VCHANGE,
     NODE_STMT_IF,
     NODE_STMT_ELSE,
@@ -154,6 +166,8 @@ typedef struct NodeStmt {
     union {
         NodeStmtChar char_;
         NodeStmtInt int_;
+        NodeStmtShort short_;
+        NodeStmtLong long_;
         NodeStmtExit exit_;
         NodeStmtIf if_;
         NodeStmtElse else_;

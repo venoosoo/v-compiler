@@ -20,6 +20,8 @@ typedef enum {
     token_type_close_paren,
     token_type_ident,
     token_type_int, //int type
+    token_type_short,
+    token_type_long,
     token_type_char_t, // char type
     token_type_char_v, // char value
     token_type_eq_kw,

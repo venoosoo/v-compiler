@@ -73,7 +73,6 @@ void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
         ensure_var_slot(g, stmt->as.int_.ident.value);
         collect_vars_in_expr(&stmt->as.int_.expr, g);
     } else if (stmt->kind == NODE_STMT_CHAR) {
-        printf("debug: %s\n", stmt->as.char_.ident.value);
         ensure_var_slot(g, stmt->as.char_.ident.value);
         collect_vars_in_expr(&stmt->as.char_.expr, g);
     } else if (stmt->kind == NODE_STMT_EXIT) {
@@ -138,6 +137,16 @@ void collect_vars_in_expr(const NodeExpr* expr, gen_data* g) {
 void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g) {
     if (!stmt || !g) return;
     //TODO: refactor it so i dont create this shit for every type
+    if (stmt->kind == NODE_STMT_SHORT) {
+        const char* name = stmt->as.short_.ident.value;
+        ensure_var_slot(g, name);
+        collect_vars_in_expr(&stmt->as.short_.expr, g);
+    }
+    if (stmt->kind == NODE_STMT_LONG) {
+        const char* name = stmt->as.long_.ident.value;
+        ensure_var_slot(g, name);
+        collect_vars_in_expr(&stmt->as.long_.expr, g);
+    }
     if (stmt->kind == NODE_STMT_INT) {
         const char* name = stmt->as.int_.ident.value;
         ensure_var_slot(g, name);
@@ -312,15 +321,23 @@ void gen_expr_to_rax(gen_data* g, const NodeExpr* expr, NodeStmtKind kind) {
             emit(g, "   mov eax, %s\n", expr->as.int_lit.int_lit.value);
         } else if (kind == NODE_STMT_CHAR) {
             emit(g, "   mov al, %s\n", expr->as.char_.char_.value);
+        } else if (kind == NODE_STMT_SHORT) {
+            emit(g, "   mov ax, %s\n", expr->as.char_.char_.value);
+        } else if (kind == NODE_STMT_LONG) {
+            emit(g, "   mov rax, %s\n", expr->as.char_.char_.value);
         }
         return;
     } else if (expr->kind == NODE_EXPR_IDENT) {
         int slot = lookup_var_slot(g, expr->as.ident.ident.value);
         int off = slot_to_offset(g,slot);
         if (kind == NODE_STMT_INT) {
-            emit(g, "   mov eax, qword [rbp - %d]\n", off);
+            emit(g, "   mov eax, dword [rbp - %d]\n", off);
         } else if (kind == NODE_STMT_CHAR) {
             emit(g, "   mov al, byte [rbp - %d]\n", off);
+        } else if (kind == NODE_STMT_SHORT) {
+            emit(g, "   mov ax, word [rbp - %d]\n", off);
+        } else if (kind == NODE_STMT_LONG) {
+            emit(g, "   mov rax, qword [rbp - %d]\n", off);
         }
         return;
     } else if (expr->kind == NODE_EXPR_BIN) {
