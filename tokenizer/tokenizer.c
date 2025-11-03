@@ -93,7 +93,9 @@ TokenArray tokenize(Token_data* t) {
                 push_token(t,&tokens, token_type_short);
             } else if (strcmp(t->m_buf, "long") == 0) {
                 push_token(t,&tokens, token_type_long);
-            }  else {
+            } else if (strcmp(t->m_buf, "return") == 0) {
+                push_token(t,&tokens, token_type_return);
+            }else {
                 push_token_value(t, &tokens, token_type_ident);
             }
 
@@ -150,6 +152,7 @@ TokenArray tokenize(Token_data* t) {
                     consume(t);
                     push_token_value(t, &tokens, token_type_char_v);
                     break;
+                case ',': push_token(t, &tokens, token_type_comma); break;
                 case '+': push_token(t, &tokens, token_type_plus); break;
                 case '*': push_token(t, &tokens, token_type_multi); break;
                 case '/': push_token(t, &tokens, token_type_divide); break;

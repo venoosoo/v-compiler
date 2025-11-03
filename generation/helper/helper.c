@@ -23,8 +23,24 @@ int slot_to_offset(gen_data* g,int slot_index) {
     for(int i = 0; i <= slot_index; i++) {
         NodeStmt stmt = kv_A(g->m_prog->stmt, i);
         switch(stmt.kind) {
-            case NODE_STMT_INT: size+=8; break;
+            case NODE_STMT_INT: size+=4; break;
             case NODE_STMT_CHAR: size +=1; break;
+            case NODE_STMT_SHORT: size +=2; break;
+            case NODE_STMT_LONG: size +=8; break;
+            case NODE_STMT_FUNC:
+                for (int i = 0; i < kv_size(stmt.as.func.types); i++) {
+                    switch (kv_A(stmt.as.func.types, i).pair[0].type) {
+                        case token_type_int:
+                            size+=4; break;
+                        case token_type_short:
+                            size+=2; break;
+                        case token_type_long:
+                            size+=8;break;
+                        case token_type_char_t:
+                            size+=1;break;
+                    }
+                }
+                break;
         }
     }
     return size;
@@ -39,7 +55,7 @@ int next_label(void) { return __label_counter++; }
 //   - first pass: create hash entries for every let identifier (keys present and var allocated)
 //   - second pass: assign slot indices (0..n-1) in source-order, including nested lets
 // ------------------------
-void ensure_var_slot(gen_data* g, const char* name) {
+void ensure_var_slot(gen_data* g, const char* name, int type) {
     if (!g || !name) return;
 
     // Check if the variable already exists
@@ -52,11 +68,46 @@ void ensure_var_slot(gen_data* g, const char* name) {
     // Variable not found, add new slot
     stack_vars sv;
     sv.name = strdup(name);
+    sv.type = type;
     if (!sv.name) { perror("strdup"); exit(1); }
 
     kv_push(stack_vars, *g->m_vars, sv);
 }
 
+
+int get_type_by_name(gen_data* g, const char* name) {
+    for (size_t i = 0; i < kv_size(*g->m_vars); i++) {
+        if (strcmp(kv_A(*g->m_vars, i).name, name) == 0) {
+            return kv_A(*g->m_vars,i).type;
+        }
+    }
+    printf("Trying to get type of undefined var\n");
+    exit(1);
+}
+
+void emit_move_to_ident(gen_data* g, int off, NodeStmt* stmt) {
+    if (stmt->kind == NODE_STMT_INT) {
+        emit(g, "   mov eax, dword [rbp - %d]\n", off);
+    } else if (stmt->kind == NODE_STMT_CHAR) {
+        emit(g, "   mov al, byte [rbp - %d]\n", off);
+    } else if (stmt->kind == NODE_STMT_SHORT) {
+        emit(g, "   mov ax, word [rbp - %d]\n", off);
+    } else if (stmt->kind == NODE_STMT_LONG) {
+        emit(g, "   mov rax, qword [rbp - %d]\n", off);
+    } 
+}
+
+void emit_ident_to_move(gen_data* g, int off, int type) {
+    if (type == token_type_int) {
+        emit(g, "   mov dword [rbp - %d], eax\n", off);
+    } else if (type == token_type_char_t) {
+        emit(g, "   mov byte [rbp - %d], al\n", off);
+    } else if (type == token_type_short) {
+        emit(g, "   mov word [rbp - %d], ax\n", off);
+    } else if (type == token_type_long) {
+        emit(g, "   mov qword [rbp - %d], rax\n", off);
+    } 
+}
 
 void collect_vars(const NodeProg* prog, gen_data* g) {
     if (!prog || !g) return;
@@ -70,11 +121,17 @@ void collect_vars(const NodeProg* prog, gen_data* g) {
 void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
     if (!stmt) return;
     if (stmt->kind == NODE_STMT_INT) {
-        ensure_var_slot(g, stmt->as.int_.ident.value);
+        ensure_var_slot(g, stmt->as.int_.ident.value, stmt->as.int_.ident.type);
         collect_vars_in_expr(&stmt->as.int_.expr, g);
     } else if (stmt->kind == NODE_STMT_CHAR) {
-        ensure_var_slot(g, stmt->as.char_.ident.value);
+        ensure_var_slot(g, stmt->as.char_.ident.value, stmt->as.char_.ident.type);
         collect_vars_in_expr(&stmt->as.char_.expr, g);
+    } else if (stmt->kind == NODE_STMT_SHORT) {
+        ensure_var_slot(g, stmt->as.short_.ident.value, stmt->as.short_.ident.type);
+        collect_vars_in_expr(&stmt->as.short_.expr, g);
+    } else if (stmt->kind == NODE_STMT_LONG) {
+        ensure_var_slot(g, stmt->as.long_.ident.value, stmt->as.long_.ident.type);
+        collect_vars_in_expr(&stmt->as.long_.expr, g);
     } else if (stmt->kind == NODE_STMT_EXIT) {
         collect_vars_in_expr(&stmt->as.exit_.expr, g);
     } else if (stmt->kind == NODE_STMT_IF) {
@@ -86,6 +143,9 @@ void collect_vars_in_stmt(const NodeStmt* stmt, gen_data* g) {
         collect_vars_in_stmt(stmt->as.for_.cond1,g);    
     }
 }
+
+
+
 
 void collect_vars_in_expr(const NodeExpr* expr, gen_data* g) {
     if (!expr) return;
@@ -136,25 +196,20 @@ void collect_vars_in_expr(const NodeExpr* expr, gen_data* g) {
 
 void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g) {
     if (!stmt || !g) return;
-    //TODO: refactor it so i dont create this shit for every type
     if (stmt->kind == NODE_STMT_SHORT) {
-        const char* name = stmt->as.short_.ident.value;
-        ensure_var_slot(g, name);
+        ensure_var_slot(g, stmt->as.short_.ident.value, stmt->as.short_.ident.type);
         collect_vars_in_expr(&stmt->as.short_.expr, g);
     }
     if (stmt->kind == NODE_STMT_LONG) {
-        const char* name = stmt->as.long_.ident.value;
-        ensure_var_slot(g, name);
+        ensure_var_slot(g, stmt->as.long_.ident.value, stmt->as.long_.ident.type);
         collect_vars_in_expr(&stmt->as.long_.expr, g);
     }
     if (stmt->kind == NODE_STMT_INT) {
-        const char* name = stmt->as.int_.ident.value;
-        ensure_var_slot(g, name);
+        ensure_var_slot(g, stmt->as.int_.ident.value, stmt->as.int_.ident.type);
         collect_vars_in_expr(&stmt->as.int_.expr, g);
 
     } else if (stmt->kind == NODE_STMT_CHAR) {
-        const char* name = stmt->as.char_.ident.value;
-        ensure_var_slot(g, name);
+        ensure_var_slot(g, stmt->as.char_.ident.value, stmt->as.char_.ident.type);
         collect_vars_in_expr(&stmt->as.char_.expr, g);
 
     } else if (stmt->kind == NODE_STMT_EXIT) {
@@ -163,6 +218,10 @@ void assign_slots_in_stmt(const NodeStmt* stmt, gen_data* g) {
     } else if (stmt->kind == NODE_STMT_IF) {
         for (size_t i = 0; i < kv_size(stmt->as.if_.body); ++i) {
             assign_slots_in_stmt(&kv_A(stmt->as.if_.body, i), g);
+        }
+    } else if (stmt->kind == NODE_STMT_FUNC) {
+        for (size_t i = 0; i < kv_size(stmt->as.func.body); ++i) {
+            assign_slots_in_stmt(&kv_A(stmt->as.func.body, i), g);
         }
 
     } else if (stmt->kind == NODE_STMT_FOR) {
@@ -195,35 +254,45 @@ int lookup_var_slot(gen_data* g, const char* name) {
 }
 
 // Evaluate a BindExprRec into rax
-void gen_bindexpr_to_rax(gen_data* g, const BindExprRec rec) {
+
+void gen_bindexpr_to_rax(gen_data* g, const BindExprRec rec, NodeStmt* stmt) {
     if (rec.type == NODE_EXPR) {
         NodeExpr* n = rec.as.node_expr;
         if (!n) { emit(g, "   ; gen: NULL node\n"); return; }
         if (n->kind == NODE_EXPR_INT_LIT) {
-            emit(g, "   mov rax, %s\n", n->as.int_lit.int_lit.value);
+            emit(g, "   mov eax, %s\n", n->as.int_lit.int_lit.value);
             return;
         } else if (n->kind == NODE_EXPR_IDENT) {
             int slot = lookup_var_slot(g, n->as.ident.ident.value);
             int off = slot_to_offset(g,slot);
-            emit(g, "   mov rax, qword [rbp - %d]\n", off);
+            emit_move_to_ident(g, off,stmt);
             return;
         } else if (n->kind == NODE_EXPR_BIN && n->as.bin) {
-            gen_binexpr_to_rax(g, n->as.bin);
+            gen_binexpr_to_rax(g, n->as.bin, stmt);
             return;
         } else {
             emit(g, "   ; gen: unsupported node kind %d\n", n->kind);
             return;
         }
     } else if (rec.type == BIN_EXPR) {
-        gen_binexpr_to_rax(g, rec.as.bin_expr);
+        gen_binexpr_to_rax(g, rec.as.bin_expr, stmt);
         return;
     } else {
         emit(g, "   ; gen: unknown BindExprRec.type %d\n", rec.type);
     }
 }
 
+RegPair get_regpair_for_stmt(int type) {
+    switch (type) {
+        case token_type_long:  return (RegPair){ "rbx", "rax" };
+        case token_type_int:   return (RegPair){ "ebx", "eax" };
+        case token_type_short: return (RegPair){ "bx",  "ax"  };
+        case token_type_char_t:  return (RegPair){ "bl",  "al"  };
+        default:              printf("unkown token kind: %d\n",type);  return (RegPair){ "??",  "??"  };
+    }
+}
 // Evaluate a BinExpr (pointer) into rax
-void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
+void gen_binexpr_to_rax(gen_data* g, const BinExpr* b, NodeStmt* stmt) {
     if (!b) return;
 
     BindExprRec lhs, rhs;
@@ -238,10 +307,13 @@ void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
     // Arithmetic operations
     if (b->kind == BIN_EXPR_ADD || b->kind == BIN_EXPR_MINUS ||
         b->kind == BIN_EXPR_MULTI || b->kind == BIN_EXPR_DIVIDE) {
-        gen_bindexpr_to_rax(g, lhs);     // lhs -> rax
+        int type = get_type_by_name(g, stmt->as.vchange.ident.value);
+        printf("type: %d\n",type);
+        RegPair reg = get_regpair_for_stmt(type);
+        gen_bindexpr_to_rax(g, lhs,stmt);     // lhs -> rax
         emit(g, "   push rax\n");
-        gen_bindexpr_to_rax(g, rhs);     // rhs -> rax
-        emit(g, "   mov rbx, rax\n");    // rbx = rhs
+        gen_bindexpr_to_rax(g, rhs,stmt); 
+        emit(g, "   mov %s, %s\n",reg.dst,reg.src);
         emit(g, "   pop rax\n");         // rax = lhs
 
         switch (b->kind) {
@@ -259,9 +331,9 @@ void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
         b->kind == BIN_EXPR_LT || b->kind == BIN_EXPR_LTE ||
         b->kind == BIN_EXPR_MR || b->kind == BIN_EXPR_MRE) {
 
-        gen_bindexpr_to_rax(g, lhs);
+        gen_bindexpr_to_rax(g, lhs,stmt);
         emit(g, "   push rax\n");
-        gen_bindexpr_to_rax(g, rhs);
+        gen_bindexpr_to_rax(g, rhs,stmt);
         emit(g, "   mov rbx, rax\n");
         emit(g, "   pop rax\n");
         emit(g, "   cmp rax, rbx\n");
@@ -282,12 +354,12 @@ void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
     // Logical AND / OR with short-circuit
     if (b->kind == BIN_EXPR_AND || b->kind == BIN_EXPR_OR) {
         int id = next_label();
-        gen_bindexpr_to_rax(g, lhs);
+        gen_bindexpr_to_rax(g, lhs,stmt);
         emit(g, "   test rax, rax\n");
 
         if (b->kind == BIN_EXPR_AND) {
             emit(g, "   je .L_and_false_%d\n", id);
-            gen_bindexpr_to_rax(g, rhs);
+            gen_bindexpr_to_rax(g, rhs,stmt);
             emit(g, "   test rax, rax\n");
             emit(g, "   setne al\n");
             emit(g, "   movzx rax, al\n");
@@ -297,7 +369,7 @@ void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
             emit(g, ".L_and_end_%d:\n", id);
         } else { // OR
             emit(g, "   jne .L_or_true_%d\n", id);
-            gen_bindexpr_to_rax(g, rhs);
+            gen_bindexpr_to_rax(g, rhs,stmt);
             emit(g, "   test rax, rax\n");
             emit(g, "   setne al\n");
             emit(g, "   movzx rax, al\n");
@@ -312,41 +384,67 @@ void gen_binexpr_to_rax(gen_data* g, const BinExpr* b) {
     emit(g, "   ; gen_binexpr_to_rax: unhandled kind %d\n", b->kind);
 }
 
+void emit_move_to_int_lit(gen_data* g, const NodeExpr* expr, NodeStmt* stmt) {
+    if (stmt->kind == NODE_STMT_INT) {
+        emit(g, "   mov eax, %s\n", expr->as.int_lit.int_lit.value);
+    } else if (stmt->kind == NODE_STMT_CHAR) {
+        emit(g, "   mov al, %s\n", expr->as.char_.char_.value);
+    } else if (stmt->kind == NODE_STMT_SHORT) {
+        emit(g, "   mov ax, %s\n", expr->as.char_.char_.value);
+    } else if (stmt->kind == NODE_STMT_LONG) {
+        emit(g, "   mov rax, %s\n", expr->as.char_.char_.value);
+    }
+}
 
-// Evaluate NodeExpr (result in rax)
-void gen_expr_to_rax(gen_data* g, const NodeExpr* expr, NodeStmtKind kind) {
+
+// Evaluate NodeExpr (result in rax)    
+void gen_expr_to_rax(gen_data* g, const NodeExpr* expr, NodeStmt* stmt) {
     if (expr->kind == NODE_EXPR_EMPTY) { emit(g, "   ; gen_expr: NULL\n"); return; }
+
+    if (expr->kind == NODE_EXPR_FUNC) {
+        NodeStmt *res = malloc(sizeof(NodeStmt));
+        NodeStmtFunCall help;
+        help.args = expr->as.func.args;
+        help.name = expr->as.func.name;
+        res->kind = NODE_STMT_FUNC_USE;
+        res->as.func_call = help;
+        gen_stmt(g, res);
+        return;
+    }
+
     if (expr->kind == NODE_EXPR_INT_LIT) {
-        if (kind == NODE_STMT_INT) {
-            emit(g, "   mov eax, %s\n", expr->as.int_lit.int_lit.value);
-        } else if (kind == NODE_STMT_CHAR) {
-            emit(g, "   mov al, %s\n", expr->as.char_.char_.value);
-        } else if (kind == NODE_STMT_SHORT) {
-            emit(g, "   mov ax, %s\n", expr->as.char_.char_.value);
-        } else if (kind == NODE_STMT_LONG) {
-            emit(g, "   mov rax, %s\n", expr->as.char_.char_.value);
-        }
+        emit_move_to_int_lit(g, expr,stmt);
         return;
     } else if (expr->kind == NODE_EXPR_IDENT) {
         int slot = lookup_var_slot(g, expr->as.ident.ident.value);
         int off = slot_to_offset(g,slot);
-        if (kind == NODE_STMT_INT) {
-            emit(g, "   mov eax, dword [rbp - %d]\n", off);
-        } else if (kind == NODE_STMT_CHAR) {
-            emit(g, "   mov al, byte [rbp - %d]\n", off);
-        } else if (kind == NODE_STMT_SHORT) {
-            emit(g, "   mov ax, word [rbp - %d]\n", off);
-        } else if (kind == NODE_STMT_LONG) {
-            emit(g, "   mov rax, qword [rbp - %d]\n", off);
+        emit_move_to_ident(g,off,stmt);
+        // the func arg
+        if (stmt->kind == NODE_STMT_FUNC) {
+            for (int i = 0; i < kv_size(stmt->as.func.types); i++) {
+                char* type = kv_A(stmt->as.func.types, i).pair[0].value;
+
+                switch (i) {
+                    case 0: emit(g, "  mov edi, dword [%s]\n", type); break;
+                    case 1: emit(g, "  mov esi, dword [%s]\n", type); break;
+                    case 2: emit(g, "  mov edx, dword [%s]\n", type); break;
+                    case 3: emit(g, "  mov ecx, dword [%s]\n", type); break;
+                    case 4: emit(g, "  mov r8d, dword [%s]\n", type); break;
+                    case 5: emit(g, "  mov r9d, dword [%s]\n", type); break;
+                    default:
+                        // Stack-passed argument
+                        emit(g, "  mov rax, qword [%s] ; push on stack manually\n", type);
+                        emit(g, "  push rax\n");
+                        break;
+                }
+            }
         }
         return;
     } else if (expr->kind == NODE_EXPR_BIN) {
-        gen_binexpr_to_rax(g, expr->as.bin);
+        gen_binexpr_to_rax(g, expr->as.bin, stmt);
         return;
     } else if (expr->kind == NODE_EXPR_CHAR) {
         emit(g, "   mov al, %d\n", (int)*expr->as.char_.char_.value);
-        printf("value: %s\n", expr->as.char_.char_.value);
-        printf("num: %d\n", (int)*expr->as.char_.char_.value);
         return;
     } else {
         printf("gen_expr: unknown kind %d\n", expr->kind);

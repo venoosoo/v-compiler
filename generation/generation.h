@@ -19,20 +19,27 @@ typedef struct {
 
 typedef struct stack_vars {
     char* name;
-    Token type;
+    int type;
 } stack_vars;
 
 typedef kvec_t(char*) StrVec;
+typedef kvec_t(int) IntVec;
 typedef kvec_t(stack_vars) StackVec;
 // vector of vector-of-strings
 typedef kvec_t(StrVec) Str2DVec;
+typedef struct args_func {
+    char* name;
+    IntVec arg_types;
+} args_func;
+typedef kvec_t(args_func) func_args;
 /* gen_data */
 typedef struct gen_data {
     const NodeProg* m_prog;   /* pointer to parsed program */
     size_t m_stack_pos;
     sds m_output;
-    StackVec *m_vars;    // unordered map of all vars
+    StackVec *m_vars;    // array of all vars
     Str2DVec *m_block; // for local visibility
+    func_args *m_func;
 } gen_data;
 
 

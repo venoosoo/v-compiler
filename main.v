@@ -1,5 +1,7 @@
-short x = 67000;
-long b = 10;
-int a = 25;
-int sum = a + b;
-exit(sum);
+int main(int code) {
+    code = code * code;
+    return code;
+}
+
+int a = main(5);
+exit(a);

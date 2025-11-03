@@ -8,6 +8,10 @@ typedef struct Parser_data Parser_data;
 typedef struct NodeExpr NodeExpr;
 typedef struct NodeStmt NodeStmt;
 typedef kvec_t(NodeStmt) NodeStmtArray;
+typedef struct {
+    Token pair[2]; // 0 is type 1 is name
+} Arg;
+typedef kvec_t(Arg) Args;
 
 struct Parser_data {
     int m_index;
@@ -83,8 +87,14 @@ typedef enum {
     NODE_EXPR_IDENT,
     NODE_EXPR_BIN,
     NODE_EXPR_CHAR,
+    NODE_EXPR_FUNC,
     NODE_EXPR_EMPTY,
 } NodeExprKind;
+
+typedef struct NodeExprFunc {
+    Token name;
+    TokenArray args;
+} NodeExprFunc;
 
 struct NodeExpr {
     NodeExprKind kind;
@@ -92,6 +102,7 @@ struct NodeExpr {
         NodeExprIntLit int_lit;
         NodeExprIdent ident;
         NodeExprChar char_;
+        NodeExprFunc func;
         BinExpr* bin;
     } as;
 };
@@ -138,6 +149,9 @@ typedef enum {
     NODE_STMT_ELSE,
     NODE_STMT_WHILE,
     NODE_STMT_FOR,
+    NODE_STMT_FUNC_USE,
+    NODE_STMT_FUNC, // init
+    NODE_STMT_RETURN,
 } NodeStmtKind;
 
 typedef struct NodeStmtIf {
@@ -161,6 +175,31 @@ typedef struct NodeStmtFor {
     NodeStmtArray body;
 } NodeStmtFor;
 
+
+typedef struct NodeStmtReturnType {
+    NodeExpr ReturnType;
+} NodeStmtReturnType;
+
+typedef struct NodeStmtReturn {
+    NodeExpr res;
+} NodeStmtReturn;
+
+
+typedef struct NodeStmtFunction {
+    Token name;
+    NodeStmtReturnType return_type;
+    Token ExpectedReturnType;
+    NodeStmtArray body;
+    Args types;
+} NodeStmtFunction;
+
+
+typedef struct NodeStmtFunCall {
+    Token name;
+    TokenArray args;
+
+} NodeStmtFunCall;
+
 typedef struct NodeStmt {
     NodeStmtKind kind;
     union {
@@ -173,6 +212,9 @@ typedef struct NodeStmt {
         NodeStmtElse else_;
         NodeStmtWhile while_;
         NodeStmtFor for_;
+        NodeStmtReturn return_;
+        NodeStmtFunction func; // init
+        NodeStmtFunCall func_call;
         NodeStmtVchange vchange;
     } as;
 } NodeStmt;

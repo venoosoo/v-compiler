@@ -196,6 +196,17 @@ void print_optional_prog(OptionalNodeProg* prog) {
                         printf("    Stmt: VCHANGE\n");
                         break;
                 }
+            case NODE_STMT_FUNC:
+                printf("Statement %zu: FUNC\n",i);
+                printf("    Name:%s\n",stmt->as.func.name.value);
+                printf("    return type:%d\n",stmt->as.func.ExpectedReturnType.type);
+                break;
+            case NODE_STMT_FUNC_USE:
+                printf("Statemnet %zu: FUNC_USE\n",i);
+                printf("    Name:%s\n", stmt->as.func_call.name.value);
+            case NODE_STMT_RETURN:
+                printf("Statement %zu: RETURN\n", i);
+                printf("    Expected type: %d\n", stmt->as.return_.res.kind);
         }
     }
 }
@@ -236,9 +247,8 @@ int main(int argc, char *argv[]) {
 
 
 
-    
     gen_data* g_data = generate_gen_data(&p_result.value);
-    
+    printf("not here\n");
     FILE* f = fopen("main.asm", "w");
     if (!f) {
         printf("error in file\n");
