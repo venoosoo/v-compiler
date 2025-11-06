@@ -46,6 +46,7 @@ typedef enum {
     token_type_while,
     token_type_comma,
     token_type_return,
+    token_type_void,
     token_empty,
 
 } TokenType;

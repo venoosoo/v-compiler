@@ -95,7 +95,9 @@ TokenArray tokenize(Token_data* t) {
                 push_token(t,&tokens, token_type_long);
             } else if (strcmp(t->m_buf, "return") == 0) {
                 push_token(t,&tokens, token_type_return);
-            }else {
+            } else if (strcmp(t->m_buf, "void") == 0) {
+                push_token(t, &tokens, token_type_void);
+            } else {
                 push_token_value(t, &tokens, token_type_ident);
             }
 

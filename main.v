@@ -1,7 +1,6 @@
-int main(int code) {
-    code = code * code;
-    return code;
+void bla(char x) {
+    exit(x);
 }
 
-int a = main(5);
-exit(a);
+char g = 'b';
+exit(g);

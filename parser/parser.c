@@ -38,7 +38,8 @@ bool is_type(TokenType type) {
     return type == token_type_char_t ||
            type == token_type_int ||
            type == token_type_short ||
-           type == token_type_long;
+           type == token_type_long ||
+           type == token_type_void;
 }
 
 
@@ -604,6 +605,8 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
 
     if(t0.has_value && t0.value.type == token_type_ident &&
         t1.has_value && t1.value.type == token_type_open_paren) {
+            // func call
+
             NodeStmt i_tired_of_this;
             NodeStmtFunCall nigger;
             TokenArray args;
@@ -650,6 +653,8 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
     if (t0.has_value && is_type(t0.value.type) 
         && t1.has_value && t1.value.type == token_type_ident
         && t2.has_value && t2.value.type == token_type_open_paren) {
+            // func init
+            
             NodeStmt res;
             res.kind = NODE_STMT_FUNC;
 
@@ -847,6 +852,8 @@ OptionalNodeStmt parse_stmt(Parser_data* p) {
         printf("result: %d\n", result.has_value);
         return result;
     }
+
+    
     if (t0.has_value && t0.value.type == token_type_while) {
         parser_consume(p); //consume while
         if (!(parser_peek(p,0).has_value && parser_peek(p,0).value.type == token_type_open_paren)) {

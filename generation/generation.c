@@ -49,12 +49,14 @@ void handle_vars(gen_data* g, const NodeStmt* stmt) {
             int slot = lookup_var_slot(g, stmt->as.short_.ident.value);
             int off = slot_to_offset(g,slot);
             emit(g, "   mov word [rbp - %d], ax\n", off);
+            return;
         }
         case NODE_STMT_LONG: {
             gen_expr_to_rax(g,&stmt->as.long_.expr, stmt);
             int slot = lookup_var_slot(g, stmt->as.long_.ident.value);
             int off = slot_to_offset(g,slot);
             emit(g, "   mov qword [rbp - %d], rax\n", off);
+            return;
         }
         case NODE_STMT_INT: {
             gen_expr_to_rax(g, &stmt->as.int_.expr, stmt);
@@ -114,6 +116,7 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
             char *name = kv_A(stmt->as.func.types, i).pair[1].value;
 
             ensure_var_slot(g, name,type_num);
+            printf("type num is: %d\n", type_num);
 
             // adding arg type so when using function we can acess it by name
             args_func arg;
@@ -126,11 +129,12 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
             const char *reg_part = NULL;
 
             switch ((TokenType)type_num) {
-                case token_type_char_t:  arg_size = 1; reg_part = "al"; break;
+                case token_type_char_v:  arg_size = 1; reg_part = "al"; break;
+                case token_type_char_t:  arg_size = 1; reg_part=  "al"; break;
                 case token_type_short:   arg_size = 2; reg_part = "ax"; break;
                 case token_type_int:     arg_size = 4; reg_part = "eax"; break;
                 case token_type_long:    arg_size = 8; reg_part = "rax"; break;
-                default:                 arg_size = 8; reg_part = "rax"; break;
+                default:                 arg_size = 8; reg_part = "rax"; printf("unkown type: %d\n", type_num); break;
             }
 
 
@@ -187,19 +191,23 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
                     break;
             }
 
+
             emit(g, "   mov %s, %s\n", reg_part, src_reg);
 
             int push_size = (arg_size + 15) & ~15;
             emit(g, "   sub rsp, %zu\n", push_size);
 
+
+            int slot = lookup_var_slot(g, name);
+            int offset = slot_to_offset(g, slot);
             if (arg_size == 1)
-                emit(g, "   mov byte [rsp], %s\n", reg_part);
+                emit(g, "   mov byte [rbp-%zu], %s\n", offset, src_reg);
             else if (arg_size == 2)
-                emit(g, "   mov word [rsp], %s\n", reg_part);
+                emit(g, "   mov word [rbp-%zu], %s\n", offset, src_reg);
             else if (arg_size == 4)
-                emit(g, "   mov dword [rsp], %s\n", reg_part);
+                emit(g, "   mov dword [rbp-%zu], %s\n", offset, src_reg);
             else // 8 bytes
-                emit(g, "   mov qword [rsp], %s\n", reg_part);
+                emit(g, "   mov qword [rbp-%zu], %s\n", offset, src_reg);
         }
         StrVec row;
         kv_init(row);
@@ -218,6 +226,7 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
 
 
     if (stmt->kind == NODE_STMT_VCHANGE) {
+        printf("hey\n");
         gen_expr_to_rax(g, &stmt->as.vchange.expr, stmt);
         int slot = lookup_var_slot(g, stmt->as.vchange.ident.value);
         int off = slot_to_offset(g,slot);
@@ -229,16 +238,26 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
 
     if (stmt->kind == NODE_STMT_FUNC_USE) {
         for (int i = 0; i < kv_size(*g->m_func); i++) {
-            if (kv_A(*g->m_func, i).name == stmt->as.func_call.name.value) {
-                for (int j = 0; j < kv_size(stmt->as.func_call.args); j++) {
-                    args_func arg = kv_A(*g->m_func, i);
-                    if (kv_A(arg.arg_types, j) != kv_A(stmt->as.func_call.args, j).type) {
-                        printf("when calling function types are different");
-                        exit(1);
-                    }
+            args_func arg = kv_A(*g->m_func, i);
+
+            if (kv_size(arg.arg_types) != kv_size(stmt->as.func_call.args)) {
+                printf("error: function '%s' called with wrong number of arguments\n",
+                    stmt->as.func_call.name.value);
+                exit(1);
+            }
+
+                // Check argument types
+            for (int j = 0; j < kv_size(arg.arg_types); j++) {
+                TokenType expected = kv_A(arg.arg_types, j);
+                TokenType actual = kv_A(stmt->as.func_call.args, j).type;
+                if (!check_types(expected, actual)) {
+                    printf("error: type mismatch in argument %d when calling function '%s'\n",
+                        j + 1, stmt->as.func_call.name.value);
+                    exit(1);
                 }
             }
-        }
+
+            }
         size_t arg_size;
         const char *reg_part = NULL;
         for (int i = 0; i < kv_size(stmt->as.func_call.args); i ++) {
@@ -247,7 +266,7 @@ void gen_stmt(gen_data* g, const NodeStmt* stmt) {
                 case token_type_short:   arg_size = 2; break;
                 case token_type_int_lit: arg_size = 4; break;
                 case token_type_long:    arg_size = 8; break;
-                default:                 arg_size = 8; printf("the type is: %d",kv_A(stmt->as.func_call.args, i).type); break;
+                default:                 arg_size = 8; printf("the type is: %d\n",kv_A(stmt->as.func_call.args, i).type); break;
             }
 
 

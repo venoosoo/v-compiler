@@ -204,10 +204,16 @@ void print_optional_prog(OptionalNodeProg* prog) {
             case NODE_STMT_FUNC_USE:
                 printf("Statemnet %zu: FUNC_USE\n",i);
                 printf("    Name:%s\n", stmt->as.func_call.name.value);
+                break;
             case NODE_STMT_RETURN:
                 printf("Statement %zu: RETURN\n", i);
                 printf("    Expected type: %d\n", stmt->as.return_.res.kind);
-        }
+                break;
+            case NODE_STMT_INT:
+                printf("Statement %zu: INT\n",i);
+                printf("    ident: %s\n", stmt->as.int_.ident.value);
+                break;
+            }
     }
 }
 
